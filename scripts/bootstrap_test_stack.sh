@@ -5,7 +5,7 @@
 #   eval "$(./scripts/bootstrap_test_stack.sh --export)"
 #   pytest
 #
-# WHY THIS EXISTS. `graf`'s whole surface is writes and multi-org: create a
+# WHY THIS EXISTS. `grafana-cli`'s whole surface is writes and multi-org: create a
 # dashboard, create an alert rule, discover that a contact point cannot deliver,
 # refuse to cross an org boundary. None of that is testable against somebody's
 # production Grafana, so without this script the write half of the CLI is tested
@@ -98,13 +98,13 @@ mint_sa() {         # $1=org  $2=name  $3=role  -> prints the token
 # Org 1 gets one of each role. The role matrix is a TEST (tests/test_roles_live.py),
 # not a comment, because the claim "you need Admin" was written as a comment once
 # and was wrong for weeks.
-TOK_ADMIN=$(mint_sa 1 graf-admin Admin)
-TOK_EDITOR=$(mint_sa 1 graf-editor Editor)
-TOK_VIEWER=$(mint_sa 1 graf-viewer Viewer)
+TOK_ADMIN=$(mint_sa 1 grafana-cli-admin Admin)
+TOK_EDITOR=$(mint_sa 1 grafana-cli-editor Editor)
+TOK_VIEWER=$(mint_sa 1 grafana-cli-viewer Viewer)
 # Org 2 gets one, so cross-org refusal can be proven in BOTH directions -- a
 # one-sided check would not distinguish "tokens are org-scoped" from "org 2 is
 # just broken".
-TOK_ORG2=$(mint_sa "${ORG2_ID}" graf-org2 Admin)
+TOK_ORG2=$(mint_sa "${ORG2_ID}" grafana-cli-org2 Admin)
 log "minted service-account tokens: admin/editor/viewer in org 1, admin in org ${ORG2_ID}"
 
 # ---- datasources -----------------------------------------------------
@@ -208,56 +208,55 @@ fi
 # `notify check` exist to name it -- so the test stack must be able to reproduce
 # it, or the feature's headline test would have nothing to bite on.
 #
-# Grafana refuses a contact point with an empty integration list, so the hollow
-# receiver is created the only way it can exist: referenced by the policy tree
-# without a matching contact point. Same observable end state -- `notify list`
-# reports a receiver that cannot deliver -- reached honestly.
-adm 1 -X PUT "${BASE}/api/v1/provisioning/policies" -d "{
-  \"receiver\": \"blackhole\",
-  \"group_by\": [\"grafana_folder\", \"alertname\"],
-  \"routes\": [
-    {\"receiver\": \"reachable\", \"object_matchers\": [[\"severity\", \"=\", \"critical\"]]}
-  ]
-}" >/dev/null 2>&1 || log "note: could not set the notification policy (continuing)"
-
 # A contact point that CAN deliver, so the tests can tell the two apart -- a
 # suite where everything is broken proves only that the tool says "broken".
+# We do NOT rewire the notification policy: a fresh org already routes everything
+# to its default `empty` receiver (zero integrations = the black hole), which is
+# both the headline scenario and the honest out-of-the-box state. An earlier
+# version PUT a policy pointing at a `blackhole` receiver that was never created;
+# Grafana rejected it (400 "receiver 'blackhole' does not exist") and the `||`
+# swallowed the error, so the intended routing silently never applied and the
+# default did the work by accident. Don't reach for a receiver you didn't make.
 adm 1 -X POST "${BASE}/api/v1/provisioning/contact-points" -d '{
   "name": "reachable", "type": "webhook", "settings": {"url": "http://localhost:1/hook"}
 }' >/dev/null 2>&1 || true
 
-# An alert rule that ALWAYS fires, routed (by the policy above) to the black hole.
-# Without it, `alert firing` and the end-to-end routing test skip themselves with
-# "nothing firing right now" -- and the headline feature ("this alert reaches
-# nobody") would have no live coverage at all. `for: 10s` because the rule must
-# actually reach the Firing state inside a CI run; unifiedAlerting's minInterval
-# is 10s, so anything shorter is rejected.
+# An alert rule that ALWAYS fires, so `alert firing` and the end-to-end routing
+# test have real data and do not skip -- without it the headline feature ("this
+# alert reaches nobody") would ship with no live coverage.
+#
+# The SHAPE is load-bearing and was got wrong first. A single `math: 1 > 0` as
+# the condition, with `for: 10s`, was NEVER evaluated by the scheduler
+# (lastEvaluation stayed at the zero time) -- Grafana wants a proper reduce/
+# threshold condition, not a bare boolean math. The working shape, measured:
+#   A = math `1`   ->   C = threshold `A > 0`   (condition = C)
+# plus `for: 0s` so it fires on the first evaluation instead of pending, and
+# `noDataState/execErrState: Alerting` so it fires even if a future Grafana
+# decides the expression yields nothing. This reliably reaches Firing in ~10s.
 if ! adm 1 "${BASE}/api/v1/provisioning/alert-rules" | grep -q '"title":"Always Firing"'; then
   adm 1 -X POST "${BASE}/api/v1/provisioning/alert-rules" -d "{
     \"title\": \"Always Firing\",
     \"folderUID\": \"${FOLDER_UID}\",
     \"ruleGroup\": \"seed\",
     \"orgID\": 1,
-    \"for\": \"10s\",
-    \"condition\": \"A\",
-    \"noDataState\": \"NoData\",
-    \"execErrState\": \"Error\",
+    \"for\": \"0s\",
+    \"condition\": \"C\",
+    \"noDataState\": \"Alerting\",
+    \"execErrState\": \"Alerting\",
     \"labels\": {\"seeded\": \"true\"},
     \"annotations\": {\"summary\": \"fires forever, notifies nobody -- on purpose\"},
-    \"data\": [{
-      \"refId\": \"A\",
-      \"datasourceUid\": \"__expr__\",
-      \"relativeTimeRange\": {\"from\": 600, \"to\": 0},
-      \"model\": {\"type\": \"math\", \"expression\": \"1 > 0\", \"refId\": \"A\"}
-    }]
+    \"data\": [
+      {\"refId\": \"A\", \"datasourceUid\": \"__expr__\", \"relativeTimeRange\": {\"from\": 600, \"to\": 0},
+       \"model\": {\"refId\": \"A\", \"type\": \"math\", \"expression\": \"1\"}},
+      {\"refId\": \"C\", \"datasourceUid\": \"__expr__\", \"relativeTimeRange\": {\"from\": 600, \"to\": 0},
+       \"model\": {\"refId\": \"C\", \"type\": \"threshold\", \"expression\": \"A\",
+                   \"conditions\": [{\"evaluator\": {\"type\": \"gt\", \"params\": [0]}}]}}
+    ]
   }" >/dev/null || log "note: could not seed the always-firing rule (continuing)"
 fi
 
-# Evaluate every 10s instead of the default minute. Without this the rule takes
-# over a minute to reach Firing, and the live tests skip themselves with "nothing
-# firing right now" -- i.e. the headline feature ships with no live coverage
-# because CI was too impatient to watch it work. 10s is unifiedAlerting's
-# minInterval; anything lower is rejected.
+# Evaluate every 10s instead of the default minute, so the rule reaches Firing
+# inside a CI run rather than after it. 10s is unifiedAlerting's minInterval.
 adm 1 -X PUT "${BASE}/api/v1/provisioning/folder/${FOLDER_UID}/rule-groups/seed" \
   -d "{\"title\":\"seed\",\"folderUid\":\"${FOLDER_UID}\",\"interval\":10}" >/dev/null 2>&1 || true
 
@@ -266,7 +265,7 @@ adm 1 -X PUT "${BASE}/api/v1/provisioning/folder/${FOLDER_UID}/rule-groups/seed"
 # every run), and here we can just ask.
 log "waiting for the seeded rule to reach Firing ..."
 FIRING=0
-for i in $(seq 1 24); do
+for i in $(seq 1 18); do
   FIRING=$(adm 1 "${BASE}/api/alertmanager/grafana/api/v2/alerts" | jqp 'len(d)')
   [ "${FIRING:-0}" -gt 0 ] && break
   sleep 5
@@ -284,7 +283,7 @@ fi
 # `empty` and has ZERO integrations, and the default policy routes everything to
 # it -- so out of the box, every alert Grafana raises notifies nobody. That is
 # not a quirk of this test stack; it is exactly what the production instance this
-# tool was built against looked like. `graf alert route` exists to say it out loud.
+# tool was built against looked like. `grafana-cli alert route` exists to say it out loud.
 log "seeded alerting: folder=${FOLDER_UID}, a reachable contact point, an always-firing rule"
 
 # ---- output ----------------------------------------------------------

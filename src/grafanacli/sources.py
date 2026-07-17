@@ -124,14 +124,14 @@ def resolve(client, ref: str | None, *, kind: str = "logs") -> dict:
                 f"{'Loki' if kind == 'logs' else 'Prometheus/Mimir'} is implemented."
             )
         raise ConfigError(
-            f"no {kind} datasource in this org. `graf datasource list` shows what exists."
+            f"no {kind} datasource in this org. `grafana-cli datasource list` shows what exists."
         )
     if len(supported) == 1:
         return supported[0]
     names = ", ".join(f"{d['name']} ({d['uid']})" for d in supported)
     raise ConfigError(
         f"this org has {len(supported)} {kind} datasources: {names}. Pick one with "
-        f"--datasource, or make it stick: `graf context set --datasource <uid>`."
+        f"--datasource, or make it stick: `grafana-cli context set --datasource <uid>`."
     )
 
 
@@ -175,7 +175,7 @@ def describe_loki(client, uid: str, window: TimeRange, *, sample: int = 5) -> di
         "note": (
             "these are the INDEXED labels for this window. Loki also derives labels "
             "at query time that do not appear here — notably `detected_level`, which "
-            "you can filter on with `graf logs query --level error`. Labels with one "
+            "you can filter on with `grafana-cli logs query --level error`. Labels with one "
             "value cannot narrow anything down."
         ),
     }

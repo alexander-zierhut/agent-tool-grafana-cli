@@ -1,7 +1,7 @@
 """Log analysis: fingerprinting, clustering and classification.
 
-Pure logic, no HTTP. This is the engine behind `graf scan` ("does this project
-work? anything irregular?") and `graf logs similar` ("has this happened
+Pure logic, no HTTP. This is the engine behind `grafana-cli scan` ("does this project
+work? anything irregular?") and `grafana-cli logs similar` ("has this happened
 elsewhere?").
 
 **The idea.** Ten thousand log lines are not ten thousand problems — they are

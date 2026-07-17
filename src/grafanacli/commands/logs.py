@@ -1,4 +1,4 @@
-"""`graf logs` — discover what you can query, then query it.
+"""`grafana-cli logs` — discover what you can query, then query it.
 
 This is where the family's killer-feature principle (*derive the answer the API
 refuses to give*) lands directly. Grafana will answer a LogQL query the moment
@@ -84,7 +84,7 @@ def _require_loki(ds: dict) -> None:
     if ds.get("logs") != "supported":
         raise ConfigError(
             f"{ds.get('name')} ({ds.get('type')}) is a recognised log datasource, but this "
-            f"CLI only speaks Loki today. Pick a Loki datasource — `graf logs sources` shows "
+            f"CLI only speaks Loki today. Pick a Loki datasource — `grafana-cli logs sources` shows "
             f"which ones qualify."
         )
 
@@ -105,7 +105,7 @@ def _pool(client, datasource: str | None) -> list[dict]:
     pool = [d for d in src.log_datasources(client) if d.get("logs") == "supported"]
     if not pool:
         raise ConfigError(
-            "no queryable log datasource in this org. `graf logs sources` shows what exists."
+            "no queryable log datasource in this org. `grafana-cli logs sources` shows what exists."
         )
     return pool
 
@@ -145,7 +145,7 @@ def _resolve_logql(
     win while ignoring ``--label``/``--contains``/etc that the caller also typed
     would look like they were honoured and were not. With no matchers at all,
     this falls through to :func:`_match_all_query` rather than raising, so
-    ``graf logs query -d loki`` (no selector) works the way `logs sources` and
+    ``grafana-cli logs query -d loki`` (no selector) works the way `logs sources` and
     `logs levels` already do — see `loki.pick_match_all_label`.
     """
     builder_used = bool(label) or bool(contains) or bool(exclude) or bool(regex) or bool(level)
@@ -282,7 +282,7 @@ def query(
     highest-cardinality label discovered in the window and queries
     ``{that_label=~".+"}`` — Loki rejects an empty ``{}`` selector outright, so
     "give me everything" has to be spelled as *some* real matcher. Run
-    `graf logs sources` first if that surprises you.
+    `grafana-cli logs sources` first if that surprises you.
     """
     obj = ctx_obj(ctx)
     client = obj.client()
@@ -448,7 +448,7 @@ def search(
     themselves.
 
     The point is not the list of hits, it is the ``suggestion`` field on each
-    one: a ready-to-run ``graf logs query ...`` command with the right
+    one: a ready-to-run ``grafana-cli logs query ...`` command with the right
     ``--datasource``/``--label`` (and ``--contains``, for a content hit) already
     filled in. A label name is not a query; this turns the guess into one.
 
@@ -566,7 +566,7 @@ def _group_by_labels(records: list[dict]) -> list[dict]:
 
 
 def _suggestion(uid: str, matchers: dict[str, str], *, contains: str | None = None) -> str:
-    """A copy-pasteable `graf logs query` for one hit.
+    """A copy-pasteable `grafana-cli logs query` for one hit.
 
     This is the actual point of `search`: a label name or a "yes it's in
     there somewhere" is not a query. Shell-quoting every value (`shlex.quote`)
@@ -581,7 +581,7 @@ def _suggestion(uid: str, matchers: dict[str, str], *, contains: str | None = No
     matched — the suggestion must reproduce the query that found the hit, not
     a similar-looking one.
     """
-    parts = ["graf", "logs", "query", "-d", shlex.quote(uid)]
+    parts = ["grafana-cli", "logs", "query", "-d", shlex.quote(uid)]
     for k, v in matchers.items():
         parts.append("-l")
         parts.append(shlex.quote(f"{k}={v}"))
@@ -734,7 +734,7 @@ def levels(
 
     One query per datasource against a match-all selector, then a count of
     `detected_level` values and the top problem clusters (via `analysis.cluster`,
-    same engine as `graf scan`) among them. This is deliberately the cheapest
+    same engine as `grafana-cli scan`) among them. This is deliberately the cheapest
     possible answer to "where is it worse right now" — one query per source,
     not a query per host or per error category.
 

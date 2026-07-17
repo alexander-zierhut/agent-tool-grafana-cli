@@ -24,7 +24,7 @@ HEADER = (
     "`--no-context`. Those are **stripped from argv before parsing**, so they work "
     "anywhere on the line — before or after the subcommand. `--profile/-p` and "
     "`--no-color` are ordinary root options and must therefore come **before** the "
-    "subcommand (`graf -p sales logs sources`, not `graf logs sources -p sales`)._\n\n"
+    "subcommand (`grafana-cli -p sales logs sources`, not `grafana-cli logs sources -p sales`)._\n\n"
 )
 
 
@@ -50,7 +50,7 @@ def _arguments(cmd) -> list[str]:
 
 
 def _emit_command(buf: io.StringIO, path: str, cmd) -> None:
-    buf.write(f"### `graf {path}`\n\n")
+    buf.write(f"### `grafana-cli {path}`\n\n")
     help_text = (cmd.help or getattr(cmd, "short_help", "") or "").strip()
     if help_text:
         buf.write(help_text + "\n\n")

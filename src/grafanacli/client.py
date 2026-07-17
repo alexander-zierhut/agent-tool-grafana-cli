@@ -220,7 +220,7 @@ class Client:
             f"(HTTP {resp.status_code} through Grafana's datasource proxy). Grafana "
             f"itself is fine — the server the datasource points at is down or "
             f"unreachable from Grafana. Check the datasource's URL with "
-            f"`graf datasource get {uid or '<uid>'}`.",
+            f"`grafana-cli datasource get {uid or '<uid>'}`.",
             detail={"status": resp.status_code, "datasourceUid": uid, "body": resp.text or None},
         )
 
@@ -241,7 +241,7 @@ class Client:
             raise OrgMismatch(
                 f"{msg} Service-account tokens are scoped to exactly one org and "
                 f"cannot be widened. Use one profile per org: "
-                f"`graf auth login --profile <name>` with a token minted in that org.",
+                f"`grafana-cli auth login --profile <name>` with a token minted in that org.",
                 detail=body,
             )
         if status in (401, 403):
@@ -375,7 +375,7 @@ def _permission_hint(msg: Any) -> str | None:
             f"your token lacks {needed}. Creating or editing alert rules needs the "
             f"**Editor** role (Viewer cannot), and the permission is scoped PER "
             f"FOLDER — so a token that can write rules in one folder still cannot in "
-            f"another. `graf server doctor` lists the folders yours can write to."
+            f"another. `grafana-cli server doctor` lists the folders yours can write to."
         )
     if needed.startswith("alert.notifications"):
         return (

@@ -107,16 +107,16 @@ jobs:
           # source tree either way.
           python -m venv /tmp/clean
           /tmp/clean/bin/pip install dist/*.whl
-          /tmp/clean/bin/graf --version
+          /tmp/clean/bin/grafana-cli --version
       - name: Build the single-file binary
         run: python scripts/build_binary.py
       - name: Smoke-test the binary
-        run: ./dist/graf --version
+        run: ./dist/grafana-cli --version
       # The guide is what an agent runs FIRST, with no config and no token. If it
       # can fail on a missing config dir, the tool is unusable exactly when it is
       # most needed — so prove it in the shipped artifact, not just in pytest.
       - name: The guide must work with no config, no token, no HOME
-        run: env -i PATH=/usr/bin:/bin HOME=/nonexistent ./dist/graf guide > /dev/null
+        run: env -i PATH=/usr/bin:/bin HOME=/nonexistent ./dist/grafana-cli guide > /dev/null
 
   # Generated docs can never drift: regenerate, then fail if anything changed.
   docs:

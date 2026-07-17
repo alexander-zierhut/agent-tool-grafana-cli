@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Build a single self-contained `graf` executable with PyInstaller.
+"""Build a single self-contained `grafana-cli` executable with PyInstaller.
 
 Produces one file — no Python needed on the target. A frozen binary is
 platform-specific, so run this once per OS/arch you want to ship;
 `.github/workflows/release.yml` does linux/macOS/Windows on every tag.
 
-    python scripts/build_binary.py                        # -> dist/graf
-    python scripts/build_binary.py --output graf-linux-x86_64
+    python scripts/build_binary.py                        # -> dist/grafana-cli
+    python scripts/build_binary.py --output grafana-cli-linux-x86_64
 
 This is Python rather than a shell script for one reason: **release.yml must not
 own a second copy of the flag list.** The sibling OpenProject CLI ships
@@ -101,7 +101,7 @@ def build_name(output: str, system: str) -> str:
     """The `--name` to hand PyInstaller, given the file we want out.
 
     PyInstaller appends `.exe` itself on Windows, so a requested
-    `graf-windows-x86_64.exe` must go in without the suffix or we'd risk
+    `grafana-cli-windows-x86_64.exe` must go in without the suffix or we'd risk
     `…​.exe.exe`. We rename to the exact requested name afterwards regardless
     (see `main`), so this only has to avoid the double-suffix.
     """
@@ -124,9 +124,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     binary, so the parser is its own seam and the tests pin it."""
     parser = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
     parser.add_argument(
-        "--output", default="graf",
-        help="Name of the produced file in dist/ (default: graf). "
-             "Release CI passes the per-platform asset name, e.g. graf-linux-x86_64.",
+        "--output", default="grafana-cli",
+        help="Name of the produced file in dist/ (default: grafana-cli). "
+             "Release CI passes the per-platform asset name, e.g. grafana-cli-linux-x86_64.",
     )
     parser.add_argument("--distpath", default="dist", help="Where to put the binary.")
     return parser.parse_args(argv)

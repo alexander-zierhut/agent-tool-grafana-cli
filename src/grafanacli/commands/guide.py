@@ -1,14 +1,14 @@
-"""`graf guide` — the built-in operating manual.
+"""`grafana-cli guide` — the built-in operating manual.
 
 The point is self-sufficiency: an agent with only this binary and no other
-context can run `graf guide` and learn the output contract, how to authenticate,
+context can run `grafana-cli guide` and learn the output contract, how to authenticate,
 the domain model, and the gotchas — with no README, no network and no config. It
 must therefore be structurally impossible for this command to fail with a config
 or auth error, or to block on a prompt.
 
 Verify that property, do not assume it:
 
-    env -i PATH=/usr/bin:/bin HOME=/nonexistent ./graf guide   # -> exit 0
+    env -i PATH=/usr/bin:/bin HOME=/nonexistent ./grafana-cli guide   # -> exit 0
 
 Every gotcha below was VERIFIED against a live Grafana 13.0.3 during a spike.
 They are not folklore; they are the things that will otherwise cost an agent a
@@ -20,7 +20,7 @@ from __future__ import annotations
 import typer
 
 OVERVIEW = """\
-graf — operating guide (run `graf guide <topic>` for details)
+grafana-cli — operating guide (run `grafana-cli guide <topic>` for details)
 
 WHAT IT IS
   A CLI for Grafana, built for AI agents: discover what you can get logs from,
@@ -44,20 +44,20 @@ OUTPUT CONTRACT (important for scripting/agents)
     (which uses 20, far from the error band) if you want to branch on them.
 
 AUTHENTICATE
-  Interactive:      graf auth login          (asks for the URL, then shows you
+  Interactive:      grafana-cli auth login          (asks for the URL, then shows you
                                               exactly where to get a token)
   Non-interactive:  export GRAFANA_URL=https://grafana.example.com
                     export GRAFANA_TOKEN=glsa_xxxxxxxx
   Get a token:      <your-grafana>/org/serviceaccounts  → Add service account →
                     Add token (shown ONCE).
-  Check:            graf auth status         (says WHICH backend/token is in use)
+  Check:            grafana-cli auth status         (says WHICH backend/token is in use)
 
   WHICH ROLE (measured on 13.0.3, not guessed):
     Viewer  — discovers and reads everything: sources, logs, metrics, routes.
     Editor  — the above, PLUS creating dashboards, alert rules, contact points.
     Admin   — buys this CLI nothing over Editor. Don't hand out more than you need.
   So: Viewer for read-only, Editor if you want `alert create`.
-  `graf server doctor` reports exactly what YOUR token can do, with scopes.
+  `grafana-cli server doctor` reports exactly what YOUR token can do, with scopes.
 
   NOTE: GRAFANA_TOKEN in the environment OVERRIDES a keyring login, silently. If
   results look wrong, run `auth status` — it names the token actually in use.
@@ -67,7 +67,7 @@ THE ONE THING TO KNOW: DISCOVER BEFORE YOU QUERY
   exists. Nothing in the UI or the API answers "what can I get logs from?" — you
   are expected to already know. So start here, always:
 
-    graf logs sources          # which datasources carry logs, which labels they
+    grafana-cli logs sources          # which datasources carry logs, which labels they
                                # have, and HOW MANY VALUES each label has
 
   That last part is the point. A label with one value cannot narrow anything
@@ -75,21 +75,21 @@ THE ONE THING TO KNOW: DISCOVER BEFORE YOU QUERY
 
 THE WORKFLOW THIS IS BUILT FOR
     1. deploy something (e.g. `drone-cli wait --commit HEAD`)
-    2. graf scan --since 15m              # is it broken? what should I look at?
-    3. graf logs similar "<a line>"       # has this happened elsewhere/before?
-    4. graf alert create --title ... -q '<query>'
+    2. grafana-cli scan --since 15m              # is it broken? what should I look at?
+    3. grafana-cli logs similar "<a line>"       # has this happened elsewhere/before?
+    4. grafana-cli alert create --title ... -q '<query>'
        → and it tells you AT CREATION TIME whether that alert would reach anyone
 
 ORGANISATIONS: ONE PROFILE PER ORG
   A service-account token is hard-scoped to exactly ONE org. There is no header
   or flag that widens it — asking for another org is a 401 (exit 9). So:
 
-    graf auth login                     # org A -> profile "default"
-    graf auth login --profile sales     # org B -> profile "sales"
-    graf -p sales logs sources
+    grafana-cli auth login                     # org A -> profile "default"
+    grafana-cli auth login --profile sales     # org B -> profile "sales"
+    grafana-cli -p sales logs sources
 
   Datasource uids are PER-ORG: the same Loki has a different uid in each. Sticky
-  defaults (`graf context`) are therefore stored per profile.
+  defaults (`grafana-cli context`) are therefore stored per profile.
 
 KEY GOTCHAS (each verified live — save yourself a wrong answer)
   - `detected_level` is NOT an indexed label. It does not appear in the label
@@ -104,20 +104,20 @@ KEY GOTCHAS (each verified live — save yourself a wrong answer)
     (datasource-unreachable), not an auth or config problem. Grafana is fine; the
     thing behind the datasource is not.
   - An alert can fire forever and notify NOBODY, and every Grafana screen shows
-    it working. Run `graf alert route <uid>` before you trust an alert.
+    it working. Run `grafana-cli alert route <uid>` before you trust an alert.
   - Contact points: two endpoints disagree. A receiver with zero integrations
-    shows up in one and not the other. `graf notify list` reads both.
+    shows up in one and not the other. `grafana-cli notify list` reads both.
   - Service accounts report `id: 0` and `isGrafanaAdmin: false` even when they
-    ARE an org Admin. Never gate on those. Use `graf server doctor`.
+    ARE an org Admin. Never gate on those. Use `grafana-cli server doctor`.
   - A permission NAME is not a capability — the SCOPE matters. A token can hold
     `orgs:read` and still be refused.
 
 DISCOVER
-  graf logs sources        what can I get logs from? (start here)
-  graf logs search <term>  which source is my thing called?
-  graf datasource list     everything, of every type
-  graf server doctor       what is my token actually allowed to do?
-  graf guide <topic>       the topics below
+  grafana-cli logs sources        what can I get logs from? (start here)
+  grafana-cli logs search <term>  which source is my thing called?
+  grafana-cli datasource list     everything, of every type
+  grafana-cli server doctor       what is my token actually allowed to do?
+  grafana-cli guide <topic>       the topics below
 
 TOPICS:  logs · scan · similar · alerts · notify · metrics · dashboards · orgs ·
          output · auth · context · settings · gotchas · workflow
@@ -130,20 +130,20 @@ LOGS (Loki)
 
   DISCOVER FIRST. You cannot query what you cannot name.
 
-    graf logs sources                    # datasources + labels + CARDINALITY
-    graf logs sources --since 24h        # labels are time-bounded; widen to see more
-    graf logs search api                 # which label value contains "api"?
-    graf logs search api --content       # ...and which logs mention it
+    grafana-cli logs sources                    # datasources + labels + CARDINALITY
+    grafana-cli logs sources --since 24h        # labels are time-bounded; widen to see more
+    grafana-cli logs search api                 # which label value contains "api"?
+    grafana-cli logs search api --content       # ...and which logs mention it
 
   THEN QUERY. Build a selector from labels, or pass raw LogQL.
 
-    graf logs query --label systemd_unit=docker.service --since 15m
-    graf logs query -l hostname=~web.* -l systemd_unit=api.service
-    graf logs query --level error --since 1h
-    graf logs query --contains timeout --exclude healthcheck
-    graf logs query --regex 'conn.*refused'
-    graf logs query -q '{job="x"} |= "boom"'        # raw LogQL, used verbatim
-    graf logs query --raw                            # bare log TEXT, not JSON
+    grafana-cli logs query --label systemd_unit=docker.service --since 15m
+    grafana-cli logs query -l hostname=~web.* -l systemd_unit=api.service
+    grafana-cli logs query --level error --since 1h
+    grafana-cli logs query --contains timeout --exclude healthcheck
+    grafana-cli logs query --regex 'conn.*refused'
+    grafana-cli logs query -q '{job="x"} |= "boom"'        # raw LogQL, used verbatim
+    grafana-cli logs query --raw                            # bare log TEXT, not JSON
 
   Matcher operators go on the VALUE:
     -l host=web1        exact        -l host=~web.*      regex
@@ -152,8 +152,8 @@ LOGS (Loki)
   Every result echoes the LogQL actually sent, under "query". Iterate on it.
 
   LEVELS AND WHERE TO LOOK
-    graf logs levels                     # level distribution per source
-    graf logs tail --label unit=api.service   # follow (POLLING -- see `guide gotchas`)
+    grafana-cli logs levels                     # level distribution per source
+    grafana-cli logs tail --label unit=api.service   # follow (POLLING -- see `guide gotchas`)
 
   LIMITS
     --limit defaults to your `settings show` value (100). The instance this was
@@ -166,11 +166,11 @@ SCAN — "does this work? any irregularities?"
 
   One pass that answers the question you actually have after a deploy.
 
-    graf scan                            # the default window (settings: 1h)
-    graf scan --since 15m                # just since my deploy
-    graf scan -l systemd_unit=api.service    # scope it to "my project"
-    graf scan --category deprecation     # only one kind of finding
-    graf scan --exit-code                # exit 20 if unhealthy (for CI)
+    grafana-cli scan                            # the default window (settings: 1h)
+    grafana-cli scan --since 15m                # just since my deploy
+    grafana-cli scan -l systemd_unit=api.service    # scope it to "my project"
+    grafana-cli scan --category deprecation     # only one kind of finding
+    grafana-cli scan --exit-code                # exit 20 if unhealthy (for CI)
 
   WHAT IT DOES
     Queries for problem lines two ways -- by Loki's own `detected_level`, and by
@@ -190,7 +190,7 @@ SCAN — "does this work? any irregularities?"
     - The classifier is a HEURISTIC over prose. A line saying "no errors found"
       contains "error" and will be flagged. Every finding carries its raw line
       so you can overrule it. Categories rank output; they are not verdicts.
-    - It reads LOGS ONLY. For the metrics side: `graf metrics up`.
+    - It reads LOGS ONLY. For the metrics side: `grafana-cli metrics up`.
     - A service that logs NOTHING looks identical to a healthy one from here.
       Silence is not health.
 """,
@@ -207,36 +207,36 @@ FINDING SIMILAR PROBLEMS — the methodology
 
   So one line becomes a query that finds its siblings:
 
-    graf logs similar "connection to 10.0.0.7:5432 failed after 1.2s"
-    graf logs similar --from-last              # take the most recent error
-    graf logs similar "<line>" --since 7d      # has it happened before this week?
+    grafana-cli logs similar "connection to 10.0.0.7:5432 failed after 1.2s"
+    grafana-cli logs similar --from-last              # take the most recent error
+    grafana-cli logs similar "<line>" --since 7d      # has it happened before this week?
 
   The output tells you WHICH sources it appears on and how often. That is the
   distinction that matters and that a flat log tail hides: "this error is on one
   host" and "this error is on all twenty-one" are completely different problems.
 
   Placeholders the fingerprinter uses: <TS> <UUID> <ADDR> <HEX> <DUR> <SIZE> <N>.
-  The same collapse powers `graf scan`, which is just this run over a corpus
+  The same collapse powers `grafana-cli scan`, which is just this run over a corpus
   instead of one line.
 
   WIDER METHODOLOGY
-    1. graf scan --since 1h                    # what is broken?
-    2. graf logs similar "<the example line>" --since 7d
+    1. grafana-cli scan --since 1h                    # what is broken?
+    2. grafana-cli logs similar "<the example line>" --since 7d
                                                # new, or chronic?
-    3. graf logs levels                        # is it isolated or everywhere?
-    4. graf metrics up                         # is anything actually down?
-    5. graf alert create ...                   # so it tells you next time
+    3. grafana-cli logs levels                        # is it isolated or everywhere?
+    4. grafana-cli metrics up                         # is anything actually down?
+    5. grafana-cli alert create ...                   # so it tells you next time
 """,
     # ---------------------------------------------------------------
     "alerts": """\
 ALERT RULES
 
-    graf alert list
-    graf alert get <uid>
-    graf alert firing                    # what is going off right now
-    graf alert route <uid>               # WILL IT ACTUALLY REACH ME?
-    graf alert create --title "API errors" -q '<query>' --folder <uid>
-    graf alert delete <uid> --yes
+    grafana-cli alert list
+    grafana-cli alert get <uid>
+    grafana-cli alert firing                    # what is going off right now
+    grafana-cli alert route <uid>               # WILL IT ACTUALLY REACH ME?
+    grafana-cli alert create --title "API errors" -q '<query>' --folder <uid>
+    grafana-cli alert delete <uid> --yes
 
   `alert route` IS THE POINT. Grafana will not tell you, anywhere, whether a rule
   that fires will reach a human. It gives you the rule, the policy tree and the
@@ -245,15 +245,15 @@ ALERT RULES
   (That is not hypothetical: it was the live state of the instance this was built
   against -- nine alerts, all routed to a receiver with no integrations.)
 
-    graf alert route <uid>                       # for an existing rule
-    graf alert route --label severity=critical   # hypothetical: what WOULD happen?
+    grafana-cli alert route <uid>                       # for an existing rule
+    grafana-cli alert route --label severity=critical   # hypothetical: what WOULD happen?
 
   `alert create` runs that check automatically and includes it in its output --
   creating an alert nobody will hear is the exact failure this tool prevents.
 
   CREATING
     - Rule permissions are FOLDER-SCOPED. Your token may create rules in one
-      folder and not another; `graf server doctor` lists which. A create into the
+      folder and not another; `grafana-cli server doctor` lists which. A create into the
       wrong folder is a 403, not a validation error.
     - Use --dry-run first: it prints the exact request without sending it.
     - `for` (pending period) defaults to 5m: how long the condition must hold
@@ -263,11 +263,16 @@ ALERT RULES
     "notify": """\
 NOTIFICATIONS — "if that happens again, let me know"
 
-    graf notify list                     # contact points, and whether they WORK
-    graf notify policies                 # the routing tree, flattened
-    graf notify check                    # audit EVERY rule's delivery, one pass
-    graf notify test <name>              # send a real test notification
-    graf notify silences
+    grafana-cli notify list                     # contact points, and whether they WORK
+    grafana-cli notify policies                 # the routing tree, flattened
+    grafana-cli notify check                    # audit EVERY rule's delivery, one pass
+    grafana-cli notify silences
+
+  There is deliberately no `notify test`: Grafana 13 removed the receiver-test
+  endpoint (410 Gone) and its replacement rejected every request shape measured.
+  `notify check` and `alert route` answer "will this reach me?" STATICALLY, which
+  is the better question anyway — a test notification proves one integration works
+  this second; the routing report proves the whole path is wired.
 
   THE TRAP THIS GROUP EXISTS FOR
     A "contact point" is really a set of integrations. A receiver can exist with
@@ -291,27 +296,27 @@ NOTIFICATIONS — "if that happens again, let me know"
     - Grafana injects `alertname` and `grafana_folder` itself; the default policy
       groups by exactly those two.
 
-    graf notify check    # runs all of that against every rule and reports the
+    grafana-cli notify check    # runs all of that against every rule and reports the
                          # ones that reach nobody
 """,
     # ---------------------------------------------------------------
     "metrics": """\
 METRICS (Prometheus / Mimir)
 
-    graf metrics up                      # what is DOWN right now (start here)
-    graf metrics list --filter http      # which metrics exist? (841 on a real box)
-    graf metrics list --describe         # ...with type and help text
-    graf metrics describe <metric>       # what is it, and how do I slice it?
-    graf metrics labels --label job
-    graf metrics query -q 'rate(http_requests_total[5m])'
-    graf metrics query -q 'up' --range --since 1h --step 60
+    grafana-cli metrics up                      # what is DOWN right now (start here)
+    grafana-cli metrics list --filter http      # which metrics exist? (841 on a real box)
+    grafana-cli metrics list --describe         # ...with type and help text
+    grafana-cli metrics describe <metric>       # what is it, and how do I slice it?
+    grafana-cli metrics labels --label job
+    grafana-cli metrics query -q 'rate(http_requests_total[5m])'
+    grafana-cli metrics query -q 'up' --range --since 1h --step 60
 
   NOTES
     - Mimir, Thanos and Cortex all speak PromQL; they are `prometheus` type
       datasources and this all works against them unchanged.
     - Timestamps here are SECONDS. Loki's are nanoseconds. Both go through
       `--since`/`--from`/`--to`, so you never touch either -- but if you use
-      `graf raw`, you do.
+      `grafana-cli raw`, you do.
     - `--range` returns a matrix (a series of points); without it you get an
       instant vector (one value per series). Ask for a range only if you need the
       shape over time; an instant is far cheaper.
@@ -322,17 +327,17 @@ METRICS (Prometheus / Mimir)
     "dashboards": """\
 DASHBOARDS
 
-    graf dashboard list
-    graf dashboard search latency
-    graf dashboard get <uid> --out dash.json     # NOTE: --out, not --output
-    graf dashboard panels <uid>                  # what does it actually QUERY?
-    graf dashboard create --title "API" -q '<query>' -d <datasource>
-    graf dashboard create --file dash.json --folder <uid>
-    graf dashboard folders
+    grafana-cli dashboard list
+    grafana-cli dashboard search latency
+    grafana-cli dashboard get <uid> --out dash.json     # NOTE: --out, not --output
+    grafana-cli dashboard panels <uid>                  # what does it actually QUERY?
+    grafana-cli dashboard create --title "API" -q '<query>' -d <datasource>
+    grafana-cli dashboard create --file dash.json --folder <uid>
+    grafana-cli dashboard folders
 
   `dashboard panels` is the useful one: it extracts every panel's queries,
   including the ones nested inside collapsed rows, and hands you LogQL/PromQL you
-  can run yourself with `graf logs query -q` / `graf metrics query -q`. Someone
+  can run yourself with `grafana-cli logs query -q` / `grafana-cli metrics query -q`. Someone
   else's dashboard is a pile of queries somebody already debugged; this is how you
   reuse them instead of reinventing them.
 
@@ -356,19 +361,19 @@ ORGANISATIONS — one profile per org
   There is no flag, header or endpoint that widens a token. So multi-org is done
   with PROFILES, each holding its own URL, token and org:
 
-    graf auth login                      # org A -> profile "default"
-    graf auth login --profile sales      # org B -> profile "sales"
-    graf auth profiles                   # what have I got?
-    graf -p sales logs sources           # use one
-    graf org current                     # which org am I in right now?
-    graf org check                       # does my profile's org match my token's?
+    grafana-cli auth login                      # org A -> profile "default"
+    grafana-cli auth login --profile sales      # org B -> profile "sales"
+    grafana-cli auth profiles                   # what have I got?
+    grafana-cli -p sales logs sources           # use one
+    grafana-cli org current                     # which org am I in right now?
+    grafana-cli org check                       # does my profile's org match my token's?
 
   CONSEQUENCES THAT BITE
     - Datasource UIDs are PER-ORG. The same logical Loki has a different uid in
       each org. Never copy a uid between profiles; never cache one.
-    - Sticky context is therefore stored PER PROFILE. `graf context set
+    - Sticky context is therefore stored PER PROFILE. `grafana-cli context set
       --datasource X` in one profile does not leak into another.
-    - `graf org list` shows the orgs you have PROFILES for. That is the honest
+    - `grafana-cli org list` shows the orgs you have PROFILES for. That is the honest
       answer for a normal token: listing all orgs on the server needs a
       server-admin token (`/api/orgs` -> 403 otherwise).
     - Exit 9 (wrong org) is NOT exit 4 (bad auth). Re-running `auth login` with
@@ -391,8 +396,8 @@ OUTPUT & THE RESERVED FLAGS
 
   Which is why every file destination in this tool is `--out`:
 
-    graf dashboard get <uid> --out dash.json     # correct
-    graf dashboard get <uid> --output dash.json  # would be read as a FORMAT
+    grafana-cli dashboard get <uid> --out dash.json     # correct
+    grafana-cli dashboard get <uid> --output dash.json  # would be read as a FORMAT
 
   A sibling tool shipped that exact bug for four releases: the path was swallowed
   as a format, the format silently fell back to json, and the file was written to
@@ -418,9 +423,9 @@ OUTPUT & THE RESERVED FLAGS
 AUTHENTICATION
 
   INTERACTIVE
-    graf auth login              # asks for the URL, then shows you where to get
+    grafana-cli auth login              # asks for the URL, then shows you where to get
                                  # a token for THAT server, then verifies it
-    graf auth login --profile sales      # a second org
+    grafana-cli auth login --profile sales      # a second org
 
   NON-INTERACTIVE (CI)
     export GRAFANA_URL=https://grafana.example.com
@@ -428,7 +433,7 @@ AUTHENTICATION
     # that is enough -- no config file needed at all
 
   WHERE THE TOKEN LIVES
-    Precedence: environment > OS keyring > 0600 file. `graf auth status` always
+    Precedence: environment > OS keyring > 0600 file. `grafana-cli auth status` always
     names WHICH one spoke. That matters: an exported GRAFANA_TOKEN silently
     overrides a keyring login, and the fix is visibility, never inverting the
     order (CI depends on env winning).
@@ -451,7 +456,7 @@ AUTHENTICATION
     API keys (/org/apikeys) are deprecated since Grafana 9.1. Use a service
     account.
 
-    graf server doctor    # tells you exactly what YOUR token can do, with scopes
+    grafana-cli server doctor    # tells you exactly what YOUR token can do, with scopes
 
   THINGS THAT LOOK LIKE AUTH BUGS AND ARE NOT
     - `id: 0` and `isGrafanaAdmin: false` are NORMAL for a service account, even
@@ -464,11 +469,11 @@ AUTHENTICATION
     "context": """\
 STICKY CONTEXT — defaults that persist across commands
 
-    graf context set --datasource <uid>      # stop typing -d every time
-    graf context set --since 15m
-    graf context show                        # and WHICH profile it belongs to
-    graf context clear
-    graf --no-context logs query ...         # ignore it for one command
+    grafana-cli context set --datasource <uid>      # stop typing -d every time
+    grafana-cli context set --since 15m
+    grafana-cli context show                        # and WHICH profile it belongs to
+    grafana-cli context clear
+    grafana-cli --no-context logs query ...         # ignore it for one command
 
   Keys: datasource, since, folder. Each matches a real option on real commands
   (a test enforces that -- otherwise renaming an option would silently turn its
@@ -489,11 +494,11 @@ STICKY CONTEXT — defaults that persist across commands
     "settings": """\
 SETTINGS
 
-    graf settings show
-    graf settings set-format table       # default output format
-    graf settings set-since 15m          # default lookback for logs/metrics/scan
-    graf settings set-limit 200          # default result cap
-    graf settings path                   # where the config file lives
+    grafana-cli settings show
+    grafana-cli settings set-format table       # default output format
+    grafana-cli settings set-since 15m          # default lookback for logs/metrics/scan
+    grafana-cli settings set-limit 200          # default result cap
+    grafana-cli settings path                   # where the config file lives
 
   Every setting has a sane default or is asked once on first run; there is no
   silent half-configured state. Defaults: format json (asked once on a TTY),
@@ -527,7 +532,7 @@ GOTCHAS — all verified live against Grafana 13.0.3
     nanoseconds. MILLISECONDS (13 digits) are therefore read as nanoseconds, land
     in 1970, and return {"status":"success"} with an empty result -- no error, and
     indistinguishable from "there are no logs". This CLI always sends 19 digits;
-    if you use `graf raw`, you must too.
+    if you use `grafana-cli raw`, you must too.
   - Loki rejects an empty `{}` selector. "Everything" must be spelled with a real
     matcher, e.g. `{hostname=~".+"}` -- and that only returns streams that CARRY
     the label, so a rare label silently drops streams that lack it.
@@ -538,12 +543,12 @@ GOTCHAS — all verified live against Grafana 13.0.3
   ALERTING
   - An alert can fire forever and notify NOBODY: a receiver with zero
     integrations is valid, routable, and silent. Every Grafana screen shows it
-    working. `graf alert route <uid>` is the only way to know.
+    working. `grafana-cli alert route <uid>` is the only way to know.
   - Two endpoints disagree about contact points. The provisioning API lists
     contact points; the alertmanager API lists receivers; a hollow receiver
-    appears in the second and not the first. `graf notify list` reads both.
+    appears in the second and not the first. `grafana-cli notify list` reads both.
   - Alert-rule permissions are FOLDER-SCOPED. A token may write rules in one
-    folder and not another. `graf server doctor` lists which.
+    folder and not another. `grafana-cli server doctor` lists which.
   - `/api/alertmanager/grafana/config/api/v1/alerts` is 403 even for an org Admin
     (it needs `alert.notifications.config-history:read`). Not a bug; do not use it.
 
@@ -555,7 +560,7 @@ GOTCHAS — all verified live against Grafana 13.0.3
   - Tokens are hard-scoped to one org (exit 9 if you ask for another). Datasource
     uids differ per org. One profile per org.
   - `/api/user/orgs` returns 304 with an EMPTY BODY for a service account. It is
-    useless; `graf org list` shows your profiles instead.
+    useless; `grafana-cli org list` shows your profiles instead.
 
   DATASOURCES
   - A datasource can be configured and its backend still be DOWN: exit 8, not an
@@ -581,36 +586,36 @@ THE WORKFLOW THIS TOOL IS FOR
   You just deployed. Something feels wrong. Fifteen seconds, start to finish:
 
     1. WHAT AM I EVEN LOOKING AT?
-         graf logs sources
+         grafana-cli logs sources
        Labels with one value are useless as filters; the report says which.
 
     2. IS IT BROKEN?
-         graf scan --since 15m
+         grafana-cli scan --since 15m
        Errors, panics, OOMs and deprecations, collapsed by fingerprint and ranked
        severity-first. Each finding carries a `next` command.
 
     3. IS THIS NEW?
-         graf logs similar "<the example line>" --since 7d
+         grafana-cli logs similar "<the example line>" --since 7d
        Same shape, different ids. Tells you if you just caused it, and whether it
        is on one host or all of them.
 
     4. IS ANYTHING ACTUALLY DOWN?
-         graf metrics up
+         grafana-cli metrics up
 
     5. TELL ME NEXT TIME
-         graf alert create --title "..." -q '<the query>' --folder <uid> --dry-run
-         graf alert create --title "..." -q '<the query>' --folder <uid>
+         grafana-cli alert create --title "..." -q '<the query>' --folder <uid> --dry-run
+         grafana-cli alert create --title "..." -q '<the query>' --folder <uid>
        The create reports whether that alert would reach a human. If it says no:
-         graf notify list        # which contact points can actually deliver?
-         graf notify check       # which existing rules are already silent?
+         grafana-cli notify list        # which contact points can actually deliver?
+         grafana-cli notify check       # which existing rules are already silent?
 
   ACROSS TOOLS (the family)
-    drone-cli wait --commit HEAD && graf scan --since 10m
+    drone-cli wait --commit HEAD && grafana-cli scan --since 10m
       -> "my commit built; is it healthy in production?"
 
   WHEN LOST
-    graf server doctor      # is it me, my token, my org, or the datasource?
-    graf guide gotchas      # the things that will otherwise cost you a wrong answer
+    grafana-cli server doctor      # is it me, my token, my org, or the datasource?
+    grafana-cli guide gotchas      # the things that will otherwise cost you a wrong answer
 """,
 }
 
@@ -618,7 +623,7 @@ THE WORKFLOW THIS TOOL IS FOR
 def guide(
     topic: str = typer.Argument(
         None,
-        help="A topic to expand. Omit for the overview; `graf guide topics` lists them.",
+        help="A topic to expand. Omit for the overview; `grafana-cli guide topics` lists them.",
     ),
 ) -> None:
     """Built-in operating guide — how to use this CLI without external docs.
@@ -646,7 +651,7 @@ def guide(
         # is the way out of not knowing, so a dead end here is worse than useless.
         typer.echo(
             f"No topic {topic!r}. Available topics:\n  " + "  ".join(sorted(TOPICS)) + "\n\n"
-            "Run `graf guide` for the overview.",
+            "Run `grafana-cli guide` for the overview.",
             err=True,
         )
         raise typer.Exit(2)

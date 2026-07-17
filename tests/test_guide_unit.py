@@ -12,7 +12,7 @@ by hand rather than by CI:
     so an agent reaches for it FIRST and the only broken one is the one it tries.
 
 Both are the same bug: text making a promise the tree does not keep. So these
-tests resolve every `graf ...` string in the guide and the skill against the REAL
+tests resolve every `grafana-cli ...` string in the guide and the skill against the REAL
 Typer tree, and cross-check the advertised topic list against the topics that
 exist.
 
@@ -51,16 +51,16 @@ def _real_commands() -> set[str]:
 
 
 def _groups() -> set[str]:
-    """Group names are legitimate targets too (`graf logs --help`)."""
+    """Group names are legitimate targets too (`grafana-cli logs --help`)."""
     return {p.split()[0] for p in _real_commands()}
 
 
-#: Words that follow `graf` in prose but are not commands: flags, placeholders,
+#: Words that follow `grafana-cli` in prose but are not commands: flags, placeholders,
 #: and the global options handled by the root callback.
 _NOT_A_COMMAND = re.compile(r"^(-|<|\.\.\.|\||$)")
 
-#: `graf <thing>` or `graf -p x <thing> <sub>`. Captures up to two words so
-#: `graf logs sources` resolves as a path, not just `logs`.
+#: `grafana-cli <thing>` or `grafana-cli -p x <thing> <sub>`. Captures up to two words so
+#: `grafana-cli logs sources` resolves as a path, not just `logs`.
 _INVOCATION = re.compile(r"\bgraf\s+((?:-\w+\s+\S+\s+)*)([a-z][\w-]*)(?:\s+([a-z][\w-]*))?")
 
 
@@ -79,11 +79,11 @@ def _invocations(text: str) -> set[str]:
 def _resolves(candidate: str, real: set[str], groups: set[str]) -> bool:
     if candidate in real or candidate in groups:
         return True
-    # "graf logs query" where the doc wrote "graf logs query --raw": the two-word
+    # "grafana-cli logs query" where the doc wrote "grafana-cli logs query --raw": the two-word
     # path is what we captured, so a prefix match against a real leaf is enough.
     if any(leaf == candidate or leaf.startswith(candidate + " ") for leaf in real):
         return True
-    # `graf guide gotchas` / `graf scan --since 15m`: a top-level LEAF command
+    # `grafana-cli guide gotchas` / `grafana-cli scan --since 15m`: a top-level LEAF command
     # takes ARGUMENTS, so the second word we captured is an argument, not a
     # subcommand. Resolving it as a path would be wrong -- and did produce a false
     # positive on `guide gotchas`, the very name this file exists to protect.
@@ -114,7 +114,7 @@ def test_every_command_named_in_the_overview_exists():
 def test_every_command_named_in_a_topic_exists(topic):
     real, groups = _real_commands(), _groups()
     broken = sorted(c for c in _invocations(G.TOPICS[topic]) if not _resolves(c, real, groups))
-    assert not broken, f"`graf guide {topic}` promises commands that do not exist: {broken}"
+    assert not broken, f"`grafana-cli guide {topic}` promises commands that do not exist: {broken}"
 
 
 def test_the_advertised_topic_list_matches_the_real_topics():
@@ -134,7 +134,7 @@ def test_the_guide_only_cross_references_topics_that_exist():
     so the command check above cannot see a bad topic name. This closes that gap
     for the guide's own text — the SKILL.md equivalent is further down, and the
     sibling tool shipped exactly this bug in exactly that file."""
-    referenced = set(re.findall(r"graf guide (\w+)", G.OVERVIEW + "".join(G.TOPICS.values())))
+    referenced = set(re.findall(r"grafana-cli guide (\w+)", G.OVERVIEW + "".join(G.TOPICS.values())))
     unknown = sorted(t for t in referenced if t not in G.TOPICS and t not in ("topics", "list"))
     assert not unknown, f"the guide cross-references topics that do not exist: {unknown}"
 
@@ -149,8 +149,8 @@ def test_every_topic_is_reachable_and_exits_zero():
     runner = CliRunner()
     for topic in G.TOPICS:
         result = runner.invoke(app, ["guide", topic])
-        assert result.exit_code == 0, f"`graf guide {topic}` exited {result.exit_code}"
-        assert result.stdout.strip(), f"`graf guide {topic}` printed nothing"
+        assert result.exit_code == 0, f"`grafana-cli guide {topic}` exited {result.exit_code}"
+        assert result.stdout.strip(), f"`grafana-cli guide {topic}` printed nothing"
 
 
 def test_an_unknown_topic_is_a_signpost_not_a_dead_end():
@@ -171,14 +171,14 @@ def test_the_guide_needs_no_config_no_token_no_network(monkeypatch, tmp_path):
     same reasons everything else did.
 
     The shell equivalent, worth running by hand on the built binary:
-        env -i PATH=/usr/bin:/bin HOME=/nonexistent ./graf guide
+        env -i PATH=/usr/bin:/bin HOME=/nonexistent ./grafana-cli guide
     """
     monkeypatch.setenv("GRAFANACLI_CONFIG_DIR", str(tmp_path / "does-not-exist"))
     for var in ("GRAFANA_URL", "GRAFANA_TOKEN", "GRAFANACLI_URL", "GRAFANACLI_TOKEN"):
         monkeypatch.delenv(var, raising=False)
     result = CliRunner().invoke(app, ["guide"])
     assert result.exit_code == 0
-    assert "graf" in result.stdout
+    assert "grafana-cli" in result.stdout
 
 
 def test_the_guide_documents_the_exit_codes_the_code_actually_raises():
@@ -213,7 +213,7 @@ def test_every_command_named_in_the_skill_exists():
 def test_the_skill_only_points_at_topics_that_exist():
     """The exact sibling defect: a skill pointing at `guide gotchas` when no such
     topic existed, so the first thing an agent tried exited 2."""
-    referenced = set(re.findall(r"graf guide (\w+)", I.SKILL_MD))
+    referenced = set(re.findall(r"grafana-cli guide (\w+)", I.SKILL_MD))
     unknown = sorted(t for t in referenced if t not in G.TOPICS and t not in ("topics", "list"))
     assert not unknown, f"SKILL.md points at nonexistent guide topics: {unknown}"
 

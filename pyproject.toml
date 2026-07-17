@@ -56,7 +56,7 @@ Changelog = "https://github.com/alexander-zierhut/agent-tool-grafana-cli/release
 # official binary shipped with every Grafana server install (plugin management),
 # and shadowing it is the same mistake we refused with `op` and `drone`.
 # `grafanactl` is also taken (grafana/grafanactl, dashboards-as-code).
-graf = "grafanacli.cli:main"
+grafana-cli = "grafanacli.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -1,4 +1,4 @@
-"""`graf metrics` — PromQL against Prometheus/Mimir, through the datasource proxy.
+"""`grafana-cli metrics` — PromQL against Prometheus/Mimir, through the datasource proxy.
 
 Same tunnel as Loki (:mod:`.logs`), different backend and — this is the whole
 reason this module exists separately rather than sharing a helper with Loki's
@@ -482,7 +482,7 @@ def up_check(
     """Run `up` and report which scrape targets are down.
 
     This is the single most useful PromQL query there is, and the metrics half
-    of "does this project work?" (`graf logs sources` / `graf scan` cover the
+    of "does this project work?" (`grafana-cli logs sources` / `grafana-cli scan` cover the
     logs half). Every target Prometheus/Mimir scrapes reports `up` == 1 or 0 —
     no PromQL knowledge required to ask "is anything broken right now".
     """

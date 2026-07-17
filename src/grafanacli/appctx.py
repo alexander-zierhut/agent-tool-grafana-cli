@@ -106,7 +106,7 @@ class AppContext:
         try:
             self.config.default_format = fmt.value
             self.config.save()
-            sys.stderr.write("Saved. Change it any time: `graf settings set-format <fmt>`\n\n")
+            sys.stderr.write("Saved. Change it any time: `grafana-cli settings set-format <fmt>`\n\n")
         except Exception:
             pass  # a first-run nicety must never fail a real command
         return fmt
@@ -116,7 +116,7 @@ class AppContext:
     def _maybe_offer_claude_skill(self) -> None:
         """Offer to register the Claude Code skill. Once, ever, on a real TTY.
 
-        Without this, `graf install claude` is discoverable only by someone who
+        Without this, `grafana-cli install claude` is discoverable only by someone who
         already read the help far enough to know it exists — i.e. the person who
         least needs telling. The skill is what makes Claude reach for this CLI at
         all, so a user who never learns it exists gets none of the tool.
@@ -147,10 +147,10 @@ class AppContext:
             self.config.save()  # if this fails we ask again -- but we install nothing
 
             sys.stderr.write(
-                "\nClaude Code is installed here. Register `graf` as a skill, so Claude\n"
+                "\nClaude Code is installed here. Register `grafana-cli` as a skill, so Claude\n"
                 "uses it automatically when you mention Grafana, Loki logs or dashboards?\n"
                 "  writes ~/.claude/skills/grafana/SKILL.md — undo with "
-                "`graf install claude --uninstall`\n"
+                "`grafana-cli install claude --uninstall`\n"
                 "Install it? [y/N]: "
             )
             sys.stderr.flush()
@@ -160,7 +160,7 @@ class AppContext:
                 # be on screen, or declining once means never finding it again.
                 sys.stderr.write(
                     "Skipped — you will not be asked again. "
-                    "Change your mind any time: `graf install claude`\n\n"
+                    "Change your mind any time: `grafana-cli install claude`\n\n"
                 )
                 return
             path = install.write_skill()
@@ -183,7 +183,7 @@ class AppContext:
             token = credentials.get_token(self.config.active_profile_name())
             if not token:
                 raise ConfigError(
-                    "no API token. Run `graf auth login`, or set GRAFANA_TOKEN "
+                    "no API token. Run `grafana-cli auth login`, or set GRAFANA_TOKEN "
                     f"(create a service account at {token_url(prof.base_url)})."
                 )
             self._client = Client(

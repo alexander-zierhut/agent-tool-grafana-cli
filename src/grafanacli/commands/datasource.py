@@ -1,7 +1,7 @@
-"""`graf datasource` — list, inspect, and health-check datasources.
+"""`grafana-cli datasource` — list, inspect, and health-check datasources.
 
 This group is the plain-CRUD complement to :mod:`sources`, which is the pure
-discovery engine (`graf logs sources` / `graf metrics sources`). Everything
+discovery engine (`grafana-cli logs sources` / `grafana-cli metrics sources`). Everything
 here calls straight through to `sources.py` rather than re-deriving anything —
 the interesting logic (classification, cardinality, the enumerate-and-probe
 walk) already lives there and is already tested without a server.
@@ -159,7 +159,7 @@ def _resolve(client, ref: str) -> dict:
     except NotFoundError:
         raise NotFoundError(
             f"no datasource {ref!r} (tried as uid and as name) in this org. "
-            f"`graf datasource list` shows what exists."
+            f"`grafana-cli datasource list` shows what exists."
         ) from None
 
 

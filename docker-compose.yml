@@ -74,7 +74,7 @@ services:
         condition: service_healthy
     healthcheck:
       # /api/health is unauthenticated (verified live) -- which is exactly why it
-      # is the right readiness probe, and the first rung of `graf server doctor`.
+      # is the right readiness probe, and the first rung of `grafana-cli server doctor`.
       test: ["CMD-SHELL", "wget -q -O- http://localhost:3000/api/health | grep -q '\"database\": *\"ok\"'"]
       interval: 3s
       timeout: 3s

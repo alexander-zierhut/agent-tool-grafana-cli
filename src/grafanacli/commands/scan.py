@@ -1,4 +1,4 @@
-"""`graf scan` — the headline command: "does this project work? anything irregular?"
+"""`grafana-cli scan` — the headline command: "does this project work? anything irregular?"
 
 An agent runs this once, right after a deploy, with no more context than a
 datasource and maybe a label narrowing it to "the project". It has to come back
@@ -45,7 +45,7 @@ from ._shared import ctx_obj, need_datasource, need_window, parse_label_args
 # command made successfully, not a failure OF this command, so the default exit
 # is 0 even when `verdict.healthy` is false. Mirrors drone's `wait --exit-code`
 # band (20-29), independently chosen here for the same reason: an agent that
-# does `graf scan --exit-code && ./deploy-confirmed.sh` needs a code that can
+# does `grafana-cli scan --exit-code && ./deploy-confirmed.sh` needs a code that can
 # never collide with "your token is bad" (4) or "that datasource doesn't exist"
 # (5/8).
 EXIT_UNHEALTHY = 20
@@ -131,9 +131,9 @@ def scan(
     one panic outranks a thousand timeouts, because the panic is the one you
     actually have to go fix.
 
-        graf scan                                          # everything on the default datasource, last hour
-        graf scan --label systemd_unit=myapp.service        # just this project
-        graf scan --since 15m --exit-code && echo "clean"   # gate a deploy script
+        grafana-cli scan                                          # everything on the default datasource, last hour
+        grafana-cli scan --label systemd_unit=myapp.service        # just this project
+        grafana-cli scan --since 15m --exit-code && echo "clean"   # gate a deploy script
 
     **The classifier is a heuristic over log PROSE, not a verdict.** A line that
     says "no errors found" contains the word "error" and WILL be classified as
@@ -145,7 +145,7 @@ def scan(
     alarm over a stray word.
 
     **Logs only, and that is a real blind spot.** This never looks at metrics —
-    `graf metrics up` is the complementary check for "is the process even
+    `grafana-cli metrics up` is the complementary check for "is the process even
     running". More importantly: a service that logs NOTHING AT ALL in the
     window looks IDENTICAL here to a healthy, quiet one. Silence is not
     evidence of health, only absence of the one signal this command reads.
@@ -317,10 +317,10 @@ def _next_command(ds: dict, matchers: dict[str, str], finding: dict) -> str:
         source = str(finding["sources"][0]["source"])
         key, _, value = source.partition("=")
         return (
-            f"graf logs similar {shlex.quote(example)} "
+            f"grafana-cli logs similar {shlex.quote(example)} "
             f"--datasource {shlex.quote(uid)} --label {key}={shlex.quote(value)}"
         )
-    parts = [f"graf logs query --datasource {shlex.quote(uid)}"]
+    parts = [f"grafana-cli logs query --datasource {shlex.quote(uid)}"]
     for k, v in matchers.items():
         parts.append(f"--label {k}={shlex.quote(v)}")
     regex = analysis.to_regex(str(finding.get("fingerprint") or ""))

@@ -20,16 +20,16 @@ def _version_callback(value: bool) -> None:
 
 
 app = typer.Typer(
-    name="graf",
+    name="grafana-cli",
     help=(
         "Agent-friendly CLI for Grafana: find what you can get logs from, read them, "
         "work out what is wrong, and set up an alert so you hear about it next time.\n\n"
         "Output is JSON on stdout by default (errors are JSON on stderr with a non-zero "
         "exit code); add `-o table` or trim with `--fields label,values`. Start with "
-        "`graf logs sources` — you cannot query what you cannot name.\n\n"
-        "New here / no context? Run `graf guide` for the full playbook."
+        "`grafana-cli logs sources` — you cannot query what you cannot name.\n\n"
+        "New here / no context? Run `grafana-cli guide` for the full playbook."
     ),
-    epilog="Learn more:  `graf guide`  ·  `graf guide <topic>`  ·  `graf <group> --help`",
+    epilog="Learn more:  `grafana-cli guide`  ·  `grafana-cli guide <topic>`  ·  `grafana-cli <group> --help`",
     no_args_is_help=True,
     add_completion=False,
     # A security decision, not cosmetics: locals hold the API token, and a
@@ -188,7 +188,7 @@ from .commands import (  # noqa: E402
 app.command("guide", help="Built-in operating guide — how to use this CLI without external docs.")(guide.guide)
 
 # Top-level, because this is the thing you actually came here to do. The whole
-# point of the tool is "I deployed, is it broken?" -> `graf scan`; burying that
+# point of the tool is "I deployed, is it broken?" -> `grafana-cli scan`; burying that
 # under a group would make the answer harder to find than the problem.
 app.command("scan", help="Is this healthy? Find errors, panics and deprecations in one pass.")(scan.scan)
 

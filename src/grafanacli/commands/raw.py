@@ -14,7 +14,7 @@ leading ``/api/`` is tolerated and stripped, because that is what people paste.
 datasource's own API (Loki, Prometheus) is not a plain path under `/api` — it is
 a tunnel through ``/api/datasources/proxy/uid/{uid}/...``, e.g.::
 
-    graf raw get /datasources/proxy/uid/<uid>/loki/api/v1/labels
+    grafana-cli raw get /datasources/proxy/uid/<uid>/loki/api/v1/labels
 
 A direct connection to Loki itself cannot reproduce this: one org's Loki
 datasource injects a secret header (``X-Loki-Label-Preset``) that lives in

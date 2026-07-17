@@ -82,7 +82,7 @@ def build_selector(matchers: dict[str, str] | None = None, *, match_all_label: s
         if not match_all_label:
             raise ValidationError(
                 "a log query needs at least one label matcher — Loki rejects an "
-                "empty '{}' selector. Run `graf logs sources` to see which labels "
+                "empty '{}' selector. Run `grafana-cli logs sources` to see which labels "
                 "exist and how many values each has."
             )
         parts.append(f'{match_all_label}=~".+"')

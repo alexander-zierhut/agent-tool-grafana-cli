@@ -85,9 +85,9 @@ def set_context(
 ) -> None:
     """Set/merge sticky defaults for the ACTIVE PROFILE.
 
-        graf context set --datasource P1A2B3C4
+        grafana-cli context set --datasource P1A2B3C4
 
-    Then `graf logs query` behaves like `graf logs query --datasource P1A2B3C4`,
+    Then `grafana-cli logs query` behaves like `grafana-cli logs query --datasource P1A2B3C4`,
     but only while this profile stays active — switch `--profile` and this
     context does not follow, because the UID would not mean anything there.
     """

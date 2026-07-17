@@ -6,7 +6,7 @@ about it next time.
 
 ```bash
 pipx install agent-tool-grafana-cli
-graf guide
+grafana-cli guide
 ```
 
 ## Contributing takes two commands
@@ -51,15 +51,15 @@ reach the write tier.
 You deployed. Something feels wrong. Fifteen seconds:
 
 ```bash
-graf logs sources              # what can I even get logs from?
-graf scan --since 15m          # is it broken? what should I look at first?
-graf logs similar "<a line>"   # has this happened before, or elsewhere?
-graf alert create --title "..." -q '<query>' --folder <uid>
+grafana-cli logs sources              # what can I even get logs from?
+grafana-cli scan --since 15m          # is it broken? what should I look at first?
+grafana-cli logs similar "<a line>"   # has this happened before, or elsewhere?
+grafana-cli alert create --title "..." -q '<query>' --folder <uid>
                                # ...and it tells you whether that alert would
                                # actually reach a human
 ```
 
-It pairs with the siblings: `drone-cli wait --commit HEAD && graf scan --since 10m`
+It pairs with the siblings: `drone-cli wait --commit HEAD && grafana-cli scan --since 10m`
 answers *"my commit built — is it healthy in production?"*
 
 ## The killer feature: discovery
@@ -72,7 +72,7 @@ then counting the values behind every label.
 That last step is the point:
 
 ```
-$ graf logs sources
+$ grafana-cli logs sources
   systemd_unit    91 values   useful=True
   hostname        21 values   useful=True
   job              1 values   useful=False
@@ -89,11 +89,11 @@ It joins none of them. So an alert can fire forever into a receiver with zero
 integrations, and every screen shows it firing normally.
 
 ```bash
-graf alert route <uid>
+grafana-cli alert route <uid>
 ```
 
 walks rule → labels → policy tree → receiver → integrations and says, in words,
-that nobody will be notified. `graf notify check` does it for every rule at once.
+that nobody will be notified. `grafana-cli notify check` does it for every rule at once.
 
 ## Multiple organisations
 
@@ -101,12 +101,12 @@ A Grafana service-account token is **hard-scoped to one org** — there is no he
 or flag that widens it. So multi-org is one profile per org:
 
 ```bash
-graf auth login                     # org A -> profile "default"
-graf auth login --profile sales     # org B -> profile "sales"
-graf -p sales logs sources
+grafana-cli auth login                     # org A -> profile "default"
+grafana-cli auth login --profile sales     # org B -> profile "sales"
+grafana-cli -p sales logs sources
 ```
 
-Datasource uids differ per org, so sticky defaults (`graf context`) are stored per
+Datasource uids differ per org, so sticky defaults (`grafana-cli context`) are stored per
 profile. Asking for the wrong org is exit **9**, not a generic auth error — because
 re-running `auth login` with the same token cannot fix it.
 
@@ -122,7 +122,7 @@ re-running `auth login` with the same token cannot fix it.
 - `-o table|markdown|csv`, `--fields a,b`, `--stream` (NDJSON) work anywhere on
   the line. **File destinations are `--out`** — `--output` is a reserved format flag.
 - `--dry-run` previews any write without sending it.
-- `graf guide` is the built-in manual; it works with no config, no token and no
+- `grafana-cli guide` is the built-in manual; it works with no config, no token and no
   network, because that is exactly when you need it.
 
 ## Requirements
@@ -139,7 +139,7 @@ and pinned by `tests/test_roles_live.py`:
 
 So: **Viewer for read-only** (`scan`, `logs`, `metrics`, `alert route`), **Editor**
 to create anything. **Admin buys this CLI nothing** — don't hand out more than you
-need. `graf server doctor` reports what your token can actually do, with scopes.
+need. `grafana-cli server doctor` reports what your token can actually do, with scopes.
 
 Note that alert-rule and dashboard permissions are **scoped per folder**, so an
 Editor token can write in one folder and be refused in another. Doctor lists which.
@@ -156,16 +156,31 @@ built-in `guide` so an agent can learn the tool from the tool.
 Siblings: [openproject](https://github.com/alexander-zierhut/agent-tool-openproject-cli) ·
 [drone](https://github.com/alexander-zierhut/agent-tool-drone-cli)
 
-## The name
+## The name — and one thing to know about it
 
-The command is **`graf`**, not `grafana-cli`.
+The command is **`grafana-cli`**, matching the distribution
+(`agent-tool-grafana-cli`) and the sibling tools (`drone-cli`, `openproject`).
 
-`grafana-cli` is the **official binary that ships with every Grafana server
-install** (plugin management), and `grafanactl` is Grafana's own newer
-dashboards-as-code tool. Shadowing either is the mistake we deliberately refused
-with `op` (OpenProject) and `drone` — a package manager should never win a PATH
-fight it didn't announce. The distribution keeps the family name
-(`agent-tool-grafana-cli`); only the command is short.
+**There is a name collision, and it is worth knowing before you install.**
+Grafana ships its own `grafana-cli` binary with every *server* install — it does
+plugin management and admin tasks (`grafana-cli plugins install …`). Grafana also
+has a newer `grafanactl` for dashboards-as-code. This tool is neither.
+
+In practice they rarely meet: Grafana's `grafana-cli` lives on the Grafana
+*server*, and this one lives on your *workstation* or in CI, where no Grafana
+server is installed. If you do end up with both on one machine, whichever comes
+first on `PATH` wins — so either don't do that, or invoke this one explicitly:
+
+```bash
+python -m grafanacli guide      # always this tool, whatever PATH says
+```
+
+If you would rather not take that chance, install it under a different name:
+
+```bash
+pipx install agent-tool-grafana-cli
+ln -s "$(pipx environment --value PIPX_BIN_DIR)/grafana-cli" ~/.local/bin/graf
+```
 
 ## Docs
 

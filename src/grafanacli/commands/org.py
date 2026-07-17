@@ -1,4 +1,4 @@
-"""`graf org` — organisations, and why a token only ever sees one.
+"""`grafana-cli org` — organisations, and why a token only ever sees one.
 
 This group exists to explain a constraint, not to browse a resource. Grafana's
 own multi-tenancy model invites the wrong mental model: "an org is a thing you
@@ -33,7 +33,7 @@ Two endpoints that look like they answer "what orgs exist" and do not:
   useless. This CLI does not call it.
 
 Multi-org therefore means **one profile per org**
-(`graf auth login --profile sales`), and `context` is deliberately keyed by
+(`grafana-cli auth login --profile sales`), and `context` is deliberately keyed by
 profile (see `config.py`) rather than global, because a datasource uid from
 org 1 means nothing in org 6.
 """
@@ -85,7 +85,7 @@ def current(ctx: typer.Context) -> None:
     if prof.org_id is not None and org.get("id") is not None and prof.org_id != org.get("id"):
         out["mismatch"] = (
             f"profile {prof.name!r} records org {prof.org_id}, but /api/org just answered org "
-            f"{org.get('id')} for the same token. Run `graf org check` for the full picture."
+            f"{org.get('id')} for the same token. Run `grafana-cli org check` for the full picture."
         )
     obj.emitter.emit(out)
 
@@ -131,7 +131,7 @@ def list_(ctx: typer.Context) -> None:
             "this is \"every org you have a profile for\", not \"every org on the server\": "
             "service-account tokens are scoped to one org each, and GET /api/orgs (every org) "
             "needs SERVER admin, which most tokens are not. One profile per org is how this CLI "
-            "does multi-org: `graf auth login --profile <name>` for each one."
+            "does multi-org: `grafana-cli auth login --profile <name>` for each one."
         ),
     }
     try:
@@ -199,7 +199,7 @@ def check(ctx: typer.Context) -> None:
         out["note"] = (
             f"profile {prof.name!r} has no org id on record, so nothing was asserted on the wire "
             f"for this call — the token itself belongs to org {actual_id} ({org.get('name')}). "
-            f"Not a problem, but worth recording: `graf auth login --profile {prof.name}` "
+            f"Not a problem, but worth recording: `grafana-cli auth login --profile {prof.name}` "
             f"re-derives it."
         )
     obj.emitter.emit(out)

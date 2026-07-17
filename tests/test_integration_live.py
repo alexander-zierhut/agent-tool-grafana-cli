@@ -81,7 +81,7 @@ def test_tokens_are_hard_scoped_to_one_org(live_org2):
     """The finding the whole multi-org design rests on, tested in BOTH directions
     so a one-sided quirk cannot masquerade as a rule.
 
-    If this ever passes cross-org, `graf` could switch orgs on a flag and the
+    If this ever passes cross-org, `grafana-cli` could switch orgs on a flag and the
     profile-per-org model would be unnecessary ceremony. It does not pass."""
     from grafanacli.client import Client
 

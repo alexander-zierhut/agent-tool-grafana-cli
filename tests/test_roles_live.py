@@ -109,7 +109,7 @@ def test_every_role_can_query_logs_through_the_proxy(clients, role):
     ],
 )
 def test_every_role_can_read_the_alerting_surface(clients, role, path):
-    """So `graf alert route` and `graf notify check` — which only read — work on a
+    """So `grafana-cli alert route` and `grafana-cli notify check` — which only read — work on a
     Viewer. Knowing whether your alerts reach anyone should not require the power
     to change them."""
     assert clients[role].get(path) is not None
@@ -178,6 +178,37 @@ def test_editor_and_admin_can_create_an_alert_rule(clients, role):
     created = clients[role].post("/v1/provisioning/alert-rules", json=_rule(f"rule-by-{role}"))
     assert created["uid"]
     clients["admin"].delete(f"/v1/provisioning/alert-rules/{created['uid']}")
+
+
+@needs_writes
+def test_editor_can_pause_and_unpause_a_rule(clients):
+    """Backs the "VERIFIED" claim in `alert pause`/`unpause`. Those docstrings
+    used to say the PUT shape was an unverified guess (built read-only against
+    production); that caveat is gone, so a test has to make it true.
+
+    Proves the read-modify-write specifically: PUT the WHOLE rule back with
+    `isPaused` flipped. A partial body would drop every field it omits, because
+    the provisioning API replaces the rule wholesale rather than patching it.
+    """
+    client = clients["editor"]
+    created = client.post("/v1/provisioning/alert-rules", json=_rule("pause-me"))
+    uid = created["uid"]
+    try:
+        assert created.get("isPaused") is False
+
+        rule = client.get(f"/v1/provisioning/alert-rules/{uid}")
+        rule["isPaused"] = True
+        paused = client.put(f"/v1/provisioning/alert-rules/{uid}", json=rule)
+        assert paused["isPaused"] is True
+        # The rest of the rule must survive the round-trip -- the whole reason we
+        # read-modify-write instead of sending {"isPaused": true}.
+        assert paused["title"] == "pause-me"
+        assert paused["condition"] == "A"
+
+        rule["isPaused"] = False
+        assert client.put(f"/v1/provisioning/alert-rules/{uid}", json=rule)["isPaused"] is False
+    finally:
+        clients["admin"].delete(f"/v1/provisioning/alert-rules/{uid}")
 
 
 def _rule(title: str) -> dict:

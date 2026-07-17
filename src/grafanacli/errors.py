@@ -67,7 +67,7 @@ class OrgMismatch(OpError):
     Service-account tokens are **hard-scoped to one org**. There is no header, no
     ``/api/user/using/{id}`` call, no flag that widens them: cross-org access
     means a second token, which is why this CLI does multi-org with one **profile
-    per org** (`graf auth login --profile sales`).
+    per org** (`grafana-cli auth login --profile sales`).
 
     A sibling of ``AuthError``, not a subclass, and that is the whole point: an
     agent that catches ``AuthError`` will try to re-authenticate, and re-running

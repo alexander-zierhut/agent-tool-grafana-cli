@@ -1,4 +1,4 @@
-"""`graf settings` — every setting has a sane default or is asked once.
+"""`grafana-cli settings` — every setting has a sane default or is asked once.
 
 Three settings live on `Config` (see `config.py`): `default_format` (asked once,
 interactively, on first run — see `appctx._ask_default_format`), `default_since`

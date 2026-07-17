@@ -1,4 +1,4 @@
-"""`graf auth` — log in, log out, inspect credentials.
+"""`grafana-cli auth` — log in, log out, inspect credentials.
 
 Two things make this different from the sibling CLIs' `auth.py`, and both trace
 back to one Grafana fact: a service-account token is hard-scoped to exactly one
@@ -9,7 +9,7 @@ org (verified live — see `errors.OrgMismatch`).
   match by luck or fail on the first real request. So it is *discovered*
   (`GET /api/org`, after verifying with `GET /api/user`) and stored on the
   profile — never solicited.
-* **Multi-org is one profile per org**, not a flag. `graf auth login --profile
+* **Multi-org is one profile per org**, not a flag. `grafana-cli auth login --profile
   sales` with a token minted in that org is how a second org gets added; there
   is no header, no switch, nothing that widens a single token's reach.
 """
@@ -106,7 +106,7 @@ def login(
             "  Viewer  — enough to DISCOVER and READ: `logs sources`, `logs query`,\n"
             "            `metrics`, `scan`, `alert route`. Pick this if you only read.\n"
             "  Editor  — the above, plus creating dashboards, alert rules and contact\n"
-            "            points. Pick this if you want `graf alert create`.\n"
+            "            points. Pick this if you want `grafana-cli alert create`.\n"
             "  Admin   — grants org administration this tool never uses. Not needed.\n\n"
         )
         token = _prompt("Token: ", secret=True)
@@ -170,7 +170,7 @@ def status(ctx: typer.Context) -> None:
     Precedence is env > keyring > file (see `credentials.py`), deliberately: it
     is what lets this tool run non-interactively in CI without touching a
     keyring that isn't there. But that also means an exported `GRAFANA_TOKEN`
-    silently overrides a keyring `graf auth login`, confusing exactly when you
+    silently overrides a keyring `grafana-cli auth login`, confusing exactly when you
     can least afford it — so this command always names the backend that will
     actually speak, never just whether *a* token exists.
     """
@@ -258,7 +258,7 @@ def profiles(ctx: typer.Context) -> None:
             ("Org", lambda r: f"{r['orgName']} ({r['orgId']})" if r["orgName"] else str(r["orgId"] or "")),
             ("Token", lambda r: "yes" if r["hasToken"] else "no"),
         ],
-        empty="(no profiles configured — run `graf auth login`)",
+        empty="(no profiles configured — run `grafana-cli auth login`)",
     )
 
 
@@ -269,7 +269,7 @@ def logout(
 ) -> None:
     """Remove the stored token for a profile.
 
-    The profile's server/org config is left in place — `graf auth login
+    The profile's server/org config is left in place — `grafana-cli auth login
     --profile <name>` re-populates just the token, without re-typing the URL.
     """
     obj = ctx_obj(ctx)

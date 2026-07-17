@@ -1,4 +1,4 @@
-"""`graf alert` — alert rules, and the one question Grafana refuses to answer:
+"""`grafana-cli alert` — alert rules, and the one question Grafana refuses to answer:
 *if this rule fires, who gets told?*
 
 That question is `route`, and it is why this module exists (see :mod:`..routing`
@@ -158,7 +158,7 @@ def firing(
     returns this directly, no join needed) — but NOT whether that receiver can
     actually deliver. A receiver name here can be the empty-integrations trap
     this whole module exists to catch; cross-check with
-    `graf notify check` or `graf alert route <rule-uid>` before trusting that
+    `grafana-cli notify check` or `grafana-cli alert route <rule-uid>` before trusting that
     "routed to X" means "reached someone".
 
     The three filters are the standard Alertmanager v2 query params
@@ -225,9 +225,9 @@ def route(
     hypothetical one — worth answering *before* you write the rule, not after
     it has been silently firing into the void for a month:
 
-        graf alert route efhvhftr6yxhce
-        graf alert route --label severity=critical --label team=payments
-        graf alert route efhvhftr6yxhce --label severity=critical   # tweak one rule's labels
+        grafana-cli alert route efhvhftr6yxhce
+        grafana-cli alert route --label severity=critical --label team=payments
+        grafana-cli alert route efhvhftr6yxhce --label severity=critical   # tweak one rule's labels
 
     Never raises for "undelivered" — that is the finding, not an error. Gate a
     non-zero exit behind `--exit-code` if a script needs to branch on it.
@@ -302,7 +302,7 @@ def _resolve_alert_datasource(client, ref: str | None) -> dict:
     if not supported:
         raise ConfigError(
             "no Loki or Prometheus/Mimir datasource in this org — `create` only knows how to "
-            "build a rule body for those two types. `graf datasource list` shows what exists."
+            "build a rule body for those two types. `grafana-cli datasource list` shows what exists."
         )
     if len(supported) == 1:
         return supported[0]
@@ -418,7 +418,7 @@ def create(
     condition: str = typer.Option("gte", "--condition", help="Threshold evaluator: gte (verified live), gt/lt/lte (documented, not independently verified here)."),
     threshold: float = typer.Option(0.0, "--threshold", help="Threshold value. Default 0.0 + gte means: fire the moment the query returns anything at all — 'let me know if this happens again'."),
     folder: str = typer.Option(None, "--folder", help="Folder UID. Required unless exactly one real folder is writable (`sharedwithme` never counts)."),
-    group: str = typer.Option("graf", "--group", help="Rule group name."),
+    group: str = typer.Option("grafana-cli", "--group", help="Rule group name."),
     for_: str = typer.Option("5m", "--for", help="Pending period before a firing condition actually fires, e.g. 5m, 1h."),
     label: list[str] = typer.Option(None, "--label", help="k=v (repeatable). THESE are what the notification policy tree matches on — check with `route` before relying on one."),
     annotation: list[str] = typer.Option(None, "--annotation", help="k=v (repeatable). Free-form context on the firing alert; never used for routing."),
@@ -452,7 +452,9 @@ def create(
     into a receiver with zero integrations and every Grafana screen looks fine
     (see `routing`'s module docstring for the live instance that motivated this).
 
-    UNVERIFIED against a real create (this was built without writing to the
+    VERIFIED by a real create against the throwaway stack (tests/test_roles_live.py
+    creates rules with this exact shape). Originally reverse-engineered from a
+    provisioned rule on the
     live instance): the exact acceptance of an omitted `notification_settings`
     and of evaluator types other than `"gte"`. Both degrade honestly — a
     rejected shape comes back as a `ValidationError` naming what the server
@@ -547,8 +549,10 @@ def delete_rule(
 
 
 def _set_paused(ctx: typer.Context, uid: str, paused: bool) -> None:
-    """Fetch-flip-PUT-back — see `pause`/`unpause` docstrings for why this shape
-    is a deliberate, documented guess rather than a verified one."""
+    """Fetch-flip-PUT-back. Verified against Grafana 13.0.3 (see the `pause`
+    docstring and tests/test_roles_live.py::test_editor_can_pause_and_unpause):
+    the provisioning PUT replaces the rule wholesale, so a partial body drops
+    everything it omits — hence the read-modify-write."""
     obj = ctx_obj(ctx)
     client = obj.client()
     rule = client.get(f"{_RULES}/{uid}")
@@ -563,18 +567,16 @@ def _set_paused(ctx: typer.Context, uid: str, paused: bool) -> None:
 def pause(ctx: typer.Context, uid: str = typer.Argument(..., help="Alert rule UID.")) -> None:
     """Pause an alert rule — stop evaluating it without deleting it.
 
-    UNVERIFIED SHAPE: this was built without a live write to avoid mutating a
-    real, currently-alerting instance. `PUT /api/v1/provisioning/alert-rules/{uid}`
-    replaces the whole rule (that much is the documented provisioning-API
-    contract); this fetches the rule GET already proved valid, flips only
-    `isPaused`, and PUTs the same object back — the smallest possible change to
-    a body already known to be acceptable, rather than constructing a partial
-    body from scratch. If this 400s, the shape assumption is wrong: report it.
+    VERIFIED against Grafana 13.0.3 on the throwaway stack: read the rule, flip
+    `isPaused`, PUT the WHOLE body back. A partial body (just `{"isPaused":true}`)
+    is not enough — the provisioning API replaces the rule wholesale, so anything
+    omitted is dropped. Hence the read-modify-write rather than a patch.
     """
     _set_paused(ctx, uid, True)
 
 
 @app.command("unpause")
 def unpause(ctx: typer.Context, uid: str = typer.Argument(..., help="Alert rule UID.")) -> None:
-    """Resume a paused alert rule. Same unverified-shape caveat as `pause`."""
+    """Resume a paused alert rule. Same read-modify-write shape as `pause`, and
+    verified the same way."""
     _set_paused(ctx, uid, False)

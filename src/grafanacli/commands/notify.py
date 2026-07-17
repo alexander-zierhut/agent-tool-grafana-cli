@@ -1,4 +1,4 @@
-"""`graf notify` — contact points, the policy tree, and the fleet-wide audit.
+"""`grafana-cli notify` — contact points, the policy tree, and the fleet-wide audit.
 
 Where `alert route` answers "who does THIS rule reach", `notify check` answers
 it for every rule at once — the "is my alerting actually wired up?" command.
@@ -29,7 +29,6 @@ app = typer.Typer(no_args_is_help=True)
 
 _CONTACT_POINTS = "/v1/provisioning/contact-points"
 _RECEIVERS = "/alertmanager/grafana/config/api/v1/receivers"
-_RECEIVERS_TEST = "/alertmanager/grafana/config/api/v1/receivers/test"
 _POLICIES = "/v1/provisioning/policies"
 _RULES = "/v1/provisioning/alert-rules"
 _SILENCES = "/alertmanager/grafana/api/v2/silences"
@@ -76,7 +75,7 @@ def list_contact_points(ctx: typer.Context) -> None:
     active config yet.
 
     `usable: false` is the point of this command: a contact point can exist,
-    have a name, appear in `graf alert route`'s output as a real receiver, and
+    have a name, appear in `grafana-cli alert route`'s output as a real receiver, and
     still deliver to nobody. Every screen in Grafana's own UI shows that case
     as configured and healthy.
     """
@@ -257,57 +256,34 @@ def check(
         raise typer.Exit(code=EXIT_UNDELIVERED)
 
 
-@app.command("test")
-def test(
-    ctx: typer.Context,
-    target: str = typer.Argument(..., help="Contact point NAME (as shown by `graf notify list`)."),
-    message: str = typer.Option(None, "--message", help="Summary text for the synthetic test alert."),
-) -> None:
-    """Send a real test notification through one contact point.
-
-    UNVERIFIED PATH: `POST /api/alertmanager/grafana/config/api/v1/receivers/test`
-    was not exercised against the live instance while building this (a live
-    test genuinely dispatches through whatever integration is configured, and
-    this was built read-only against a real, in-use Grafana). The live token
-    does carry `alert.notifications.receivers.test:create`, confirming the
-    CAPABILITY exists; the exact path and body shape below are this CLI's best
-    reconstruction of Alertmanager's test-receiver contract, not a verified
-    fact. If this 404s or 400s, that is the signal the shape is wrong — report
-    it rather than assume the contact point is broken.
-
-    Refuses before sending if the target has zero integrations: Grafana's test
-    API would accept the call and deliver nothing, which looks exactly like
-    success and defeats the entire point of testing. Use `--dry-run` to see
-    the exact request this would send without sending it.
-    """
-    obj = ctx_obj(ctx)
-    client = obj.client()
-
-    receivers = client.get(_RECEIVERS)
-    receivers = receivers if isinstance(receivers, list) else []
-    receiver = next((r for r in receivers if str(r.get("name")) == target), None)
-    if receiver is None:
-        known = ", ".join(str(r.get("name")) for r in receivers) or "none"
-        raise NotFoundError(f"no contact point named {target!r}. Known: {known}. `graf notify list` shows usability too.")
-
-    integrations = routing.integration_names(receiver)
-    if not integrations:
-        raise ValidationError(
-            f"contact point {target!r} has zero integrations configured — there is nothing for "
-            f"a test notification to go through. Add an integration first; otherwise Grafana's "
-            f"own test API accepts the call and delivers nothing, which reads as success."
-        )
-
-    body = {
-        "receivers": [receiver],
-        "alert": {
-            "annotations": {"summary": message or "test notification from `graf notify test`"},
-            "labels": {"alertname": "TestAlert"},
-        },
-    }
-    result = client.post(_RECEIVERS_TEST, json=body)
-    obj.emitter.emit(result if result is not None else {"status": "sent", "receiver": target})
-
+# `notify test` USED TO LIVE HERE, and it is deliberately gone.
+#
+# Grafana 13.0.3 answers the documented endpoint with **410 Gone**:
+#
+#   POST /api/alertmanager/grafana/config/api/v1/receivers/test
+#   -> 410 {"message":"This endpoint has been removed. Please use
+#           `/apis/notifications.alerting.grafana.app/v1beta1/namespaces/
+#            {namespace}/receivers/{uid}/test` instead."}
+#
+# The replacement is reachable (namespace `default` = the current org, receiver
+# uids are base64 of the title), but it rejected every body shape tried --
+# empty, an alert payload, the receiver read straight back from the API, and a
+# hand-built spec -- always with `400 Invalid receiver: 'unknown integration
+# type: '`. The settings are NOT redacted on read, so that is not the cause; the
+# envelope it wants was not worked out. All measured against the throwaway stack.
+#
+# So there is no command, rather than a command that always 400s. A CLI that
+# ships a verb which cannot work is worse than one that admits the gap: the
+# first costs you a debugging session, the second costs you a sentence.
+#
+# It is also the least missed thing here. "Will this alert reach me?" is what
+# people actually want, and `alert route` / `notify check` answer it exactly,
+# statically, without dispatching anything at a real inbox. Sending a test
+# notification only proves one integration works right now; the routing report
+# proves the whole path from rule labels to a receiver that can deliver.
+#
+# To resurrect it: work out the v1beta1 envelope against `make stack`, then add
+# a live test. Do not re-add it on a guess -- that is how it got removed.
 
 @app.command("silences")
 def silences(ctx: typer.Context) -> None:

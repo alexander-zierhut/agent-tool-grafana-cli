@@ -1,4 +1,4 @@
-"""`graf install claude` — register this CLI with Claude Code.
+"""`grafana-cli install claude` — register this CLI with Claude Code.
 
 The idiomatic way to make a CLI discoverable to Claude Code is a **Skill**: a
 ``SKILL.md`` whose ``description`` tells Claude when to use the tool. This
@@ -13,7 +13,7 @@ without either side raising. What is fresh is `SKILL_MD` itself: every trigger
 word is anchored to "Grafana" (bare "logs"/"dashboard"/"alert" would fire on any
 unrelated question), and only commands that actually exist in this tree are
 named — a sibling tool once shipped a SKILL.md pointing at a `guide gotchas`
-topic that did not exist, which is a `graf guide` exit 2 for the first agent that
+topic that did not exist, which is a `grafana-cli guide` exit 2 for the first agent that
 tries it.
 """
 
@@ -44,7 +44,7 @@ SKILL_MD = f"""\
 ---
 name: grafana
 description: >-
-  Work with Grafana via the `graf` command — discover which Grafana datasources
+  Work with Grafana via the `grafana-cli` command — discover which Grafana datasources
   carry Grafana logs, query Loki logs, tail Grafana logs live, search and
   cluster Grafana logs to find similar problems, run PromQL against a Grafana
   Prometheus/Mimir datasource, list and read Grafana dashboards, create a
@@ -58,51 +58,51 @@ description: >-
 
 # Grafana CLI (agent-tool-grafana-cli v{__version__})
 
-The `graf` command is installed on this machine and talks to the user's
+The `grafana-cli` command is installed on this machine and talks to the user's
 Grafana server over its REST API.
 
 ## Start here: you cannot query what you cannot name
 
 Grafana will not tell you "what can I get logs from?" anywhere in its UI or
-API — you are expected to already know a datasource's uid. `graf logs sources`
+API — you are expected to already know a datasource's uid. `grafana-cli logs sources`
 derives the answer instead: every log-capable datasource, with each label's
 name AND how many values it has (a label with one value cannot filter
-anything). Run this before any `graf logs query` — guessing or reusing a uid
+anything). Run this before any `grafana-cli logs query` — guessing or reusing a uid
 from a different profile queries the wrong org's logs, silently.
 
 ## The workflow this tool is for
 
-    graf scan                                          # is anything broken right now?
-    graf logs sources                                   # what CAN I get logs from?
-    graf logs query --datasource <uid> --level error --since 1h
-    graf alert create ...                                # so you hear about it next time
+    grafana-cli scan                                          # is anything broken right now?
+    grafana-cli logs sources                                   # what CAN I get logs from?
+    grafana-cli logs query --datasource <uid> --level error --since 1h
+    grafana-cli alert create ...                                # so you hear about it next time
 
 ## Learn the tool from the tool
-- `graf guide` — the built-in operating manual, with its own topic list.
-- `graf <group> --help` for any command.
+- `grafana-cli guide` — the built-in operating manual, with its own topic list.
+- `grafana-cli <group> --help` for any command.
 
 ## Commands
-- `graf guide` — the manual. `graf scan` — one-pass health check.
-- `graf logs sources|query|tail|search|similar|levels` — discovery, query,
+- `grafana-cli guide` — the manual. `grafana-cli scan` — one-pass health check.
+- `grafana-cli logs sources|query|tail|search|similar|levels` — discovery, query,
   live tail, full-text search, "find lines like this one", level breakdown.
-- `graf metrics query|list|describe|labels|up` — PromQL against
+- `grafana-cli metrics query|list|describe|labels|up` — PromQL against
   Prometheus/Mimir.
-- `graf dashboard list|search|get|panels|create|delete|folders`
-- `graf alert list|get|firing|route|create|delete` — `route` answers "will
-  this rule actually notify anyone?" before it fires for real.
-- `graf notify list|policies|check|test|silences` — contact points,
+- `grafana-cli dashboard list|search|get|panels|create|delete|folders`
+- `grafana-cli alert list|get|firing|route|create|delete|pause|unpause` — `route`
+  answers "will this rule actually notify anyone?" before it fires for real.
+- `grafana-cli notify list|policies|check|silences` — contact points,
   notification policies, silences.
-- `graf datasource list|get|health|test`
-- `graf org current|list|check`
-- `graf auth login|status|logout`
-- `graf server health|version|doctor`
-- `graf raw get|post|put|patch|delete <path>` — escape hatch, any endpoint.
-- `graf settings`, `graf context`, `graf install claude`.
+- `grafana-cli datasource list|get|health|test`
+- `grafana-cli org current|list|check`
+- `grafana-cli auth login|status|logout`
+- `grafana-cli server health|version|doctor`
+- `grafana-cli raw get|post|put|patch|delete <path>` — escape hatch, any endpoint.
+- `grafana-cli settings`, `grafana-cli context`, `grafana-cli install claude`.
 
 ## Output contract
 - Default output is JSON on stdout — parse it.
-- **Exception: log LINES are prose, not JSON** (`graf logs query`, `graf logs
-  tail`, `graf logs search`) — do not `json.loads` a log line.
+- **Exception: log LINES are prose, not JSON** (`grafana-cli logs query`, `grafana-cli logs
+  tail`, `grafana-cli logs search`) — do not `json.loads` a log line.
 - Errors are JSON on **stderr** with a non-zero exit code.
 - Trim with `--fields uid,name,type`; `-o table` for humans; `-o csv` to export.
 
@@ -117,12 +117,12 @@ A Grafana service-account token is hard-scoped to a single org; there is no
 header or flag that widens it. Multi-org therefore means multiple profiles,
 one token each:
 
-    graf auth login                          # profile "default"
-    graf auth login --profile sales          # a second org, a second token
-    graf -p sales logs sources
+    grafana-cli auth login                          # profile "default"
+    grafana-cli auth login --profile sales          # a second org, a second token
+    grafana-cli -p sales logs sources
 
-If not configured, ask the user to run `graf auth login` (or set GRAFANA_URL +
-GRAFANA_TOKEN). Check with `graf auth status` — it names which token/backend is
+If not configured, ask the user to run `grafana-cli auth login` (or set GRAFANA_URL +
+GRAFANA_TOKEN). Check with `grafana-cli auth status` — it names which token/backend is
 actually in use, since an exported GRAFANA_TOKEN silently overrides a keyring
 login.
 
@@ -132,35 +132,35 @@ nothing). Confirm destructive actions (delete a dashboard, delete an alert
 rule) with the user first.
 
 ## Stop repeating --datasource
-`graf context set --datasource <uid>` makes it the default for later commands
+`grafana-cli context set --datasource <uid>` makes it the default for later commands
 — but only for the profile active when you set it. Context is scoped PER
 PROFILE on purpose: a datasource uid from one org does not exist in another,
 so this tool never lets a stale default from org A 404 against org B. If
-output looks wrongly scoped, run `graf context show` or pass `--no-context`.
+output looks wrongly scoped, run `grafana-cli context show` or pass `--no-context`.
 
 ## Gotchas that bite once
 - Loki's own timestamps are nanoseconds through the datasource proxy; this CLI
-  handles that for you. If you drop to `graf raw`, remember it.
+  handles that for you. If you drop to `grafana-cli raw`, remember it.
 - `detected_level` is filterable on a log query but does NOT appear in the
   label list — Loki derives it at query time, not at index time.
 - A firing Grafana alert with zero notification integrations notifies NOBODY.
-  `graf alert route` / `graf notify check` say so explicitly; a bare "firing"
-  status in `graf alert firing` does not mean anyone was told.
+  `grafana-cli alert route` / `grafana-cli notify check` say so explicitly; a bare "firing"
+  status in `grafana-cli alert firing` does not mean anyone was told.
 - Listing datasources needs `datasources:read`, which Viewer has. Only WRITES
   need Editor. An Editor token can query a datasource
-  it already knows the uid of, but `graf logs sources` — discovery — needs
-  Admin; that is why `graf auth login` asks for an Admin-role token.
+  it already knows the uid of, but `grafana-cli logs sources` — discovery — needs
+  Admin; that is why `grafana-cli auth login` asks for an Admin-role token.
 
-Anything not wrapped: `graf raw get|post|put|patch|delete <path>` (paths are
+Anything not wrapped: `grafana-cli raw get|post|put|patch|delete <path>` (paths are
 relative to `<server>/api`; reaching a datasource's own API, e.g. Loki, needs
-the proxy path — see `graf raw --help`).
+the proxy path — see `grafana-cli raw --help`).
 """
 
 _MEMORY_HINT = (
     f"{_MEM_START}\n"
-    "The `graf` CLI (package agent-tool-grafana-cli) is installed. It is an "
-    "agent-ready Grafana client with JSON output — `graf logs sources` answers "
-    "'what can I get logs from?'. Run `graf guide` to learn it.\n"
+    "The `grafana-cli` CLI (package agent-tool-grafana-cli) is installed. It is an "
+    "agent-ready Grafana client with JSON output — `grafana-cli logs sources` answers "
+    "'what can I get logs from?'. Run `grafana-cli guide` to learn it.\n"
     f"{_MEM_END}\n"
 )
 
@@ -241,7 +241,7 @@ def claude(
     """Register this CLI with Claude Code as a Skill so Claude auto-uses it.
 
     Writes ~/.claude/skills/grafana/SKILL.md (idiomatic discovery). Claude then
-    invokes `graf` whenever you mention Grafana, Loki logs or dashboards.
+    invokes `grafana-cli` whenever you mention Grafana, Loki logs or dashboards.
     Reversible with --uninstall.
     """
     obj = ctx_obj(ctx)
@@ -277,7 +277,7 @@ def claude(
         "skill": str(skill_path),
         "scope": "project" if project else "user",
         "note": (
-            "Claude Code will use the `graf` CLI automatically when you mention "
+            "Claude Code will use the `grafana-cli` CLI automatically when you mention "
             "Grafana. Start a new session to pick it up."
         ),
     }

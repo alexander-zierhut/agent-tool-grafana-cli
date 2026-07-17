@@ -2,7 +2,7 @@
 
 _Auto-generated from the CLI (`python scripts/gen_docs.py`)._
 
-_Every command also accepts `--output/-o` (json\|table\|markdown\|csv), `--format/-f`, `--fields`/`--columns`, `--dry-run`, `--stream` and `--no-context`. Those are **stripped from argv before parsing**, so they work anywhere on the line — before or after the subcommand. `--profile/-p` and `--no-color` are ordinary root options and must therefore come **before** the subcommand (`graf -p sales logs sources`, not `graf logs sources -p sales`)._
+_Every command also accepts `--output/-o` (json\|table\|markdown\|csv), `--format/-f`, `--fields`/`--columns`, `--dry-run`, `--stream` and `--no-context`. Those are **stripped from argv before parsing**, so they work anywhere on the line — before or after the subcommand. `--profile/-p` and `--no-color` are ordinary root options and must therefore come **before** the subcommand (`grafana-cli -p sales logs sources`, not `grafana-cli logs sources -p sales`)._
 
 ## Groups
 
@@ -24,7 +24,7 @@ _Every command also accepts `--output/-o` (json\|table\|markdown\|csv), `--forma
 
 ## `alert`
 
-### `graf alert create`
+### `grafana-cli alert create`
 
 Create an alert rule from a query — and immediately say who it can reach.
 
@@ -54,7 +54,9 @@ creation time, not months later when a whole fleet of rules are firing
 into a receiver with zero integrations and every Grafana screen looks fine
 (see `routing`'s module docstring for the live instance that motivated this).
 
-UNVERIFIED against a real create (this was built without writing to the
+VERIFIED by a real create against the throwaway stack (tests/test_roles_live.py
+creates rules with this exact shape). Originally reverse-engineered from a
+provisioned rule on the
 live instance): the exact acceptance of an omitted `notification_settings`
 and of evaluator types other than `"gte"`. Both degrade honestly — a
 rejected shape comes back as a `ValidationError` naming what the server
@@ -74,7 +76,7 @@ did not like, not a silent wrong rule.
 | `--annotation` | k=v (repeatable). Free-form context on the firing alert; never used for routing. |
 | `--summary` | Shorthand for --annotation summary=...; wins over an explicit --annotation summary=. |
 
-### `graf alert delete`
+### `grafana-cli alert delete`
 
 Delete an alert rule. Irreversible — its evaluation state is gone.
 
@@ -87,7 +89,7 @@ evaluation stops.)
 | --- | --- |
 | `--yes`, `-y` | Skip confirmation. Required when not on a TTY. |
 
-### `graf alert firing`
+### `grafana-cli alert firing`
 
 Currently firing instances — `GET /api/alertmanager/grafana/api/v2/alerts`.
 
@@ -95,7 +97,7 @@ Shows which receiver(s) each instance is *currently* routed to (the API
 returns this directly, no join needed) — but NOT whether that receiver can
 actually deliver. A receiver name here can be the empty-integrations trap
 this whole module exists to catch; cross-check with
-`graf notify check` or `graf alert route <rule-uid>` before trusting that
+`grafana-cli notify check` or `grafana-cli alert route <rule-uid>` before trusting that
 "routed to X" means "reached someone".
 
 The three filters are the standard Alertmanager v2 query params
@@ -110,7 +112,7 @@ behaves unexpectedly.
 | `--silenced`, `--no-silenced` | Only (or exclude) silenced alerts. |
 | `--inhibited`, `--no-inhibited` | Only (or exclude) inhibited alerts. |
 
-### `graf alert get`
+### `grafana-cli alert get`
 
 Show one alert rule — `GET /api/v1/provisioning/alert-rules/{uid}`.
 
@@ -121,7 +123,7 @@ only shows what the rule IS, not what it DOES.
 
 **Arguments:** `uid` (required)
 
-### `graf alert list`
+### `grafana-cli alert list`
 
 List alert rules — `GET /api/v1/provisioning/alert-rules`.
 
@@ -136,21 +138,18 @@ because the live instance has a handful of rules, not thousands.
 | `--folder` | Only rules in this folder UID (exact match — Grafana uids are case-sensitive). |
 | `--limit` | Max rules to return. Default: the configured default_limit (100). |
 
-### `graf alert pause`
+### `grafana-cli alert pause`
 
 Pause an alert rule — stop evaluating it without deleting it.
 
-UNVERIFIED SHAPE: this was built without a live write to avoid mutating a
-real, currently-alerting instance. `PUT /api/v1/provisioning/alert-rules/{uid}`
-replaces the whole rule (that much is the documented provisioning-API
-contract); this fetches the rule GET already proved valid, flips only
-`isPaused`, and PUTs the same object back — the smallest possible change to
-a body already known to be acceptable, rather than constructing a partial
-body from scratch. If this 400s, the shape assumption is wrong: report it.
+VERIFIED against Grafana 13.0.3 on the throwaway stack: read the rule, flip
+`isPaused`, PUT the WHOLE body back. A partial body (just `{"isPaused":true}`)
+is not enough — the provisioning API replaces the rule wholesale, so anything
+omitted is dropped. Hence the read-modify-write rather than a patch.
 
 **Arguments:** `uid` (required)
 
-### `graf alert route`
+### `grafana-cli alert route`
 
 If this rule fires, who gets told? THE reason this module exists.
 
@@ -164,9 +163,9 @@ Pass a rule UID for the real question, or `--label` alone for a
 hypothetical one — worth answering *before* you write the rule, not after
 it has been silently firing into the void for a month:
 
-    graf alert route efhvhftr6yxhce
-    graf alert route --label severity=critical --label team=payments
-    graf alert route efhvhftr6yxhce --label severity=critical   # tweak one rule's labels
+    grafana-cli alert route efhvhftr6yxhce
+    grafana-cli alert route --label severity=critical --label team=payments
+    grafana-cli alert route efhvhftr6yxhce --label severity=critical   # tweak one rule's labels
 
 Never raises for "undelivered" — that is the finding, not an error. Gate a
 non-zero exit behind `--exit-code` if a script needs to branch on it.
@@ -178,15 +177,16 @@ non-zero exit behind `--exit-code` if a script needs to branch on it.
 | `--label` | k=v (repeatable). With no UID: route this hypothetical label set — 'what if an alert with severity=critical fired?' With a UID: merged onto that rule's own labels — 'what if THIS rule also carried severity=critical?' |
 | `--exit-code` | Exit 20 if nothing would be delivered. Default: always exit 0 — an undeliverable route is an observed fact about Grafana's config, not a failure of this CLI. |
 
-### `graf alert unpause`
+### `grafana-cli alert unpause`
 
-Resume a paused alert rule. Same unverified-shape caveat as `pause`.
+Resume a paused alert rule. Same read-modify-write shape as `pause`, and
+verified the same way.
 
 **Arguments:** `uid` (required)
 
 ## `auth`
 
-### `graf auth login`
+### `grafana-cli auth login`
 
 Log in and store the token in your OS keyring.
 
@@ -203,18 +203,18 @@ back from the token itself (`GET /api/org`) and stored on the profile.
 | `--profile` | Profile to write. One profile per Grafana ORG — a token cannot cross orgs, so a second org means logging in again with --profile <name> and a token minted THERE. Defaults to the currently active profile. |
 | `--insecure` | Skip TLS verification (self-signed certs). |
 
-### `graf auth logout`
+### `grafana-cli auth logout`
 
 Remove the stored token for a profile.
 
-The profile's server/org config is left in place — `graf auth login
+The profile's server/org config is left in place — `grafana-cli auth login
 --profile <name>` re-populates just the token, without re-typing the URL.
 
 | Option | Description |
 | --- | --- |
 | `--profile` | Profile to log out (default: the active one). |
 
-### `graf auth profiles`
+### `grafana-cli auth profiles`
 
 List every configured profile — the multi-org overview.
 
@@ -222,7 +222,7 @@ One profile per Grafana org is the whole multi-org model here (see
 `config.py`'s module docstring), so this is the command that answers "which
 orgs do I have set up, and which one is active right now?".
 
-### `graf auth status`
+### `grafana-cli auth status`
 
 Show the active profile, its org, and — crucially — WHICH token/backend
 is actually in use.
@@ -230,23 +230,23 @@ is actually in use.
 Precedence is env > keyring > file (see `credentials.py`), deliberately: it
 is what lets this tool run non-interactively in CI without touching a
 keyring that isn't there. But that also means an exported `GRAFANA_TOKEN`
-silently overrides a keyring `graf auth login`, confusing exactly when you
+silently overrides a keyring `grafana-cli auth login`, confusing exactly when you
 can least afford it — so this command always names the backend that will
 actually speak, never just whether *a* token exists.
 
 ## `context`
 
-### `graf context clear`
+### `grafana-cli context clear`
 
 Clear the active profile's context entirely. Other profiles' contexts are untouched.
 
-### `graf context set`
+### `grafana-cli context set`
 
 Set/merge sticky defaults for the ACTIVE PROFILE.
 
-    graf context set --datasource P1A2B3C4
+    grafana-cli context set --datasource P1A2B3C4
 
-Then `graf logs query` behaves like `graf logs query --datasource P1A2B3C4`,
+Then `grafana-cli logs query` behaves like `grafana-cli logs query --datasource P1A2B3C4`,
 but only while this profile stays active — switch `--profile` and this
 context does not follow, because the UID would not mean anything there.
 
@@ -256,7 +256,7 @@ context does not follow, because the UID would not mean anything there.
 | `--since` | Default lookback window for this profile, e.g. 1h, 15m, 2d. Validated like `settings set-since`. |
 | `--folder` | Default folder uid for dashboard/alert commands. |
 
-### `graf context show`
+### `grafana-cli context show`
 
 Show the active PROFILE's context — each value, and where it came from.
 
@@ -272,7 +272,7 @@ values are saved but NOT in force.
 
 ## `dashboard`
 
-### `graf dashboard create`
+### `grafana-cli dashboard create`
 
 Create a dashboard — `POST /api/dashboards/db`.
 
@@ -311,7 +311,7 @@ JSON included, is printed instead.
 | `--overwrite` | Allow overwriting an existing dashboard. See docstring: without a stable uid (--file mode only) there is nothing to overwrite, so this mostly matters there. |
 | `--message` | Commit message, shown in the dashboard's version history. |
 
-### `graf dashboard delete`
+### `grafana-cli dashboard delete`
 
 Delete a dashboard — `DELETE /api/dashboards/uid/{uid}`. Irreversible.
 
@@ -325,7 +325,7 @@ history are gone. Any alert rule or link pointing at this uid starts
 | --- | --- |
 | `--yes`, `-y` | Skip confirmation. |
 
-### `graf dashboard folders`
+### `grafana-cli dashboard folders`
 
 List folders — `GET /api/folders`.
 
@@ -334,7 +334,7 @@ Marks the virtual "Shared with me" folder (`uid: sharedwithme`, live:
 UI grouping, not a real folder, and `create --folder sharedwithme` is a
 trap this command exists to let a caller avoid before hitting it.
 
-### `graf dashboard get`
+### `grafana-cli dashboard get`
 
 Fetch one dashboard — `GET /api/dashboards/uid/{uid}` -> `{dashboard, meta}`.
 
@@ -351,7 +351,7 @@ d.json --overwrite` is a working round trip with no hand-editing of shape.
 | --- | --- |
 | `--out` | Write the JSON to this file instead of stdout. NOT --output: that flag name is a reserved global (the output *format*) and is stripped from the command line before this command ever sees it — a sibling tool shipped exactly that collision for four releases (the path was silently swallowed as a format, and the write landed in the wrong place with exit 0). |
 
-### `graf dashboard list`
+### `grafana-cli dashboard list`
 
 List dashboards — `GET /api/search?type=dash-db`.
 
@@ -370,7 +370,7 @@ need the older `folderIds` on an install this old.
 | `--tag` | Filter by tag (repeatable; Grafana ANDs multiple tags). |
 | `--limit` | Max dashboards (default: the configured default_limit). |
 
-### `graf dashboard panels`
+### `grafana-cli dashboard panels`
 
 What does this dashboard actually query? THE reason this group exists.
 
@@ -380,7 +380,7 @@ docstring — and reads each query target's `expr` (LogQL/PromQL),
 alongside the datasource it runs against. Where the datasource type makes
 the query language unambiguous (`loki` -> LogQL, `prometheus` -> PromQL —
 Mimir/Thanos/Cortex all report as `prometheus`), a ready-to-run
-`graf logs query` / `graf metrics query` command is included so you can
+`grafana-cli logs query` / `grafana-cli metrics query` command is included so you can
 run the same query yourself with a different window, without first
 reverse-engineering which field in the target JSON is the query.
 
@@ -391,7 +391,7 @@ saying nothing.
 
 **Arguments:** `uid` (required)
 
-### `graf dashboard search`
+### `grafana-cli dashboard search`
 
 Find dashboards by name — `GET /api/search?query=TERM&type=dash-db`.
 
@@ -407,7 +407,7 @@ command because that is how the question actually gets asked.
 
 ## `datasource`
 
-### `graf datasource get`
+### `grafana-cli datasource get`
 
 Show one datasource's config — resolved by uid or name.
 
@@ -430,7 +430,7 @@ never see the header's value through this API.
 
 **Arguments:** `ref` (required)
 
-### `graf datasource health`
+### `grafana-cli datasource health`
 
 Ask Grafana to test one datasource's connectivity.
 
@@ -442,7 +442,7 @@ rather than one of them crashing the command.
 
 **Arguments:** `ref` (required)
 
-### `graf datasource list`
+### `grafana-cli datasource list`
 
 Every datasource in this org, classified by what this CLI can do with it.
 
@@ -453,7 +453,7 @@ here yet), or `null` (neither — a plugin datasource, or one that is
 neither a log nor a metric source, e.g. a SQL datasource used only for
 dashboards).
 
-### `graf datasource test`
+### `grafana-cli datasource test`
 
 Health-check EVERY datasource in this org, in one pass.
 
@@ -469,7 +469,7 @@ a failed health check raises this command's own exit code — read `results`
 
 ## `guide`
 
-### `graf guide`
+### `grafana-cli guide`
 
 Built-in operating guide — how to use this CLI without external docs.
 
@@ -477,12 +477,12 @@ Built-in operating guide — how to use this CLI without external docs.
 
 ## `install`
 
-### `graf install claude`
+### `grafana-cli install claude`
 
 Register this CLI with Claude Code as a Skill so Claude auto-uses it.
 
 Writes ~/.claude/skills/grafana/SKILL.md (idiomatic discovery). Claude then
-invokes `graf` whenever you mention Grafana, Loki logs or dashboards.
+invokes `grafana-cli` whenever you mention Grafana, Loki logs or dashboards.
 Reversible with --uninstall.
 
 | Option | Description |
@@ -495,13 +495,13 @@ Reversible with --uninstall.
 
 ## `logs`
 
-### `graf logs levels`
+### `grafana-cli logs levels`
 
 The `detected_level` distribution per datasource — where should I look?
 
 One query per datasource against a match-all selector, then a count of
 `detected_level` values and the top problem clusters (via `analysis.cluster`,
-same engine as `graf scan`) among them. This is deliberately the cheapest
+same engine as `grafana-cli scan`) among them. This is deliberately the cheapest
 possible answer to "where is it worse right now" — one query per source,
 not a query per host or per error category.
 
@@ -521,7 +521,7 @@ before every other one.
 | `--to` | Explicit window end. Default: now. |
 | `--limit` | Max lines sampled per datasource. Default: your configured default-limit. |
 
-### `graf logs query`
+### `grafana-cli logs query`
 
 Read logs from one datasource.
 
@@ -544,7 +544,7 @@ With no ``--label`` at all (and no ``--query``), this picks the
 highest-cardinality label discovered in the window and queries
 ``{that_label=~".+"}`` — Loki rejects an empty ``{}`` selector outright, so
 "give me everything" has to be spelled as *some* real matcher. Run
-`graf logs sources` first if that surprises you.
+`grafana-cli logs sources` first if that surprises you.
 
 | Option | Description |
 | --- | --- |
@@ -562,7 +562,7 @@ highest-cardinality label discovered in the window and queries
 | `--direction` | backward (newest-first, default) or forward (oldest-first) — which end of the window --limit keeps when there are more matches than that. |
 | `--raw` | Print bare log lines as text instead of JSON — the one carve-out from this tool's output contract, because logs are prose. |
 
-### `graf logs search`
+### `grafana-cli logs search`
 
 "I don't know what my thing is called" — find out.
 
@@ -575,7 +575,7 @@ query to find which label SETS carry the term in the log lines
 themselves.
 
 The point is not the list of hits, it is the ``suggestion`` field on each
-one: a ready-to-run ``graf logs query ...`` command with the right
+one: a ready-to-run ``grafana-cli logs query ...`` command with the right
 ``--datasource``/``--label`` (and ``--contains``, for a content hit) already
 filled in. A label name is not a query; this turns the guess into one.
 
@@ -594,7 +594,7 @@ committed to a datasource yet.
 | `--to` | Explicit window end. Default: now. |
 | `--limit` | Cap on --content query results per datasource. Default: your configured default-limit. |
 
-### `graf logs similar`
+### `grafana-cli logs similar`
 
 "Has this happened elsewhere?" — search by SHAPE, not exact text.
 
@@ -630,7 +630,7 @@ hand.
 | `--to` | Explicit window end. Default: now. |
 | `--limit` | Max lines fetched per datasource. Default: your configured default-limit. |
 
-### `graf logs sources`
+### `grafana-cli logs sources`
 
 "What can I even get logs from?" — run this before anything else.
 
@@ -664,7 +664,7 @@ gives.
 | `--sample` | Example values shown per label. |
 | `--datasource`, `-d` | Restrict to one datasource (uid or name). Default: every log datasource in the org. |
 
-### `graf logs tail`
+### `grafana-cli logs tail`
 
 Follow new log lines — by POLLING, not a live stream.
 
@@ -709,7 +709,7 @@ not one line at a time.
 
 ## `metrics`
 
-### `graf metrics describe`
+### `grafana-cli metrics describe`
 
 What IS this metric, and how do you slice it?
 
@@ -730,7 +730,7 @@ series so you can see values, not just names.
 | `--to` | Explicit window end. |
 | `--datasource`, `-d` | Metrics datasource uid or name. |
 
-### `graf metrics labels`
+### `grafana-cli metrics labels`
 
 Label NAMES this datasource carries, or (with `--label`) that label's values.
 
@@ -747,7 +747,7 @@ query by — `job`, `instance`, and whatever else targets export.
 | `--limit`, `-n` | Max values returned with --label (default: default_limit). |
 | `--datasource`, `-d` | Metrics datasource uid or name. |
 
-### `graf metrics list`
+### `grafana-cli metrics list`
 
 Metric names this datasource knows (`__name__`).
 
@@ -767,7 +767,7 @@ above was counted against.
 | `--to` | Explicit window end. |
 | `--datasource`, `-d` | Metrics datasource uid or name. |
 
-### `graf metrics query`
+### `grafana-cli metrics query`
 
 Run a PromQL query. Instant by default; `--range` for a time series.
 
@@ -786,12 +786,12 @@ without needing a separate flag for it.
 | `--step` | query_range resolution step: seconds, or a duration like '30s'/'5m'. Default: computed from the window so the point count stays under Prometheus's cap. |
 | `--datasource`, `-d` | Metrics datasource uid or name. |
 
-### `graf metrics up`
+### `grafana-cli metrics up`
 
 Run `up` and report which scrape targets are down.
 
 This is the single most useful PromQL query there is, and the metrics half
-of "does this project work?" (`graf logs sources` / `graf scan` cover the
+of "does this project work?" (`grafana-cli logs sources` / `grafana-cli scan` cover the
 logs half). Every target Prometheus/Mimir scrapes reports `up` == 1 or 0 —
 no PromQL knowledge required to ask "is anything broken right now".
 
@@ -802,7 +802,7 @@ no PromQL knowledge required to ask "is anything broken right now".
 
 ## `notify`
 
-### `graf notify check`
+### `grafana-cli notify check`
 
 Audit EVERY alert rule's delivery in one pass — is alerting actually wired up?
 
@@ -821,7 +821,7 @@ with no integrations" in one call instead of re-deriving it per rule.
 | --- | --- |
 | `--exit-code` | Exit 20 if ANY rule would not be delivered. Default: always exit 0. |
 
-### `graf notify list`
+### `grafana-cli notify list`
 
 Contact points — merged from BOTH alerting APIs, because they disagree.
 
@@ -833,11 +833,11 @@ covering a contact point defined via provisioning that has not reached the
 active config yet.
 
 `usable: false` is the point of this command: a contact point can exist,
-have a name, appear in `graf alert route`'s output as a real receiver, and
+have a name, appear in `grafana-cli alert route`'s output as a real receiver, and
 still deliver to nobody. Every screen in Grafana's own UI shows that case
 as configured and healthy.
 
-### `graf notify policies`
+### `grafana-cli notify policies`
 
 The notification policy tree — `GET /api/v1/provisioning/policies`.
 
@@ -851,7 +851,7 @@ object back for anyone who wants to feed it into something else.
 | --- | --- |
 | `--tree` | Raw nested policy tree, as Grafana stores it, instead of the flattened path table. |
 
-### `graf notify silences`
+### `grafana-cli notify silences`
 
 List silences — `GET /api/alertmanager/grafana/api/v2/silences`.
 
@@ -861,34 +861,9 @@ expired silence with a stale `endsAt` is easy to mistake for a live one at
 a glance, which is exactly the kind of gap `alert route`'s `problems` field
 calls out for a currently-muted route.
 
-### `graf notify test`
-
-Send a real test notification through one contact point.
-
-UNVERIFIED PATH: `POST /api/alertmanager/grafana/config/api/v1/receivers/test`
-was not exercised against the live instance while building this (a live
-test genuinely dispatches through whatever integration is configured, and
-this was built read-only against a real, in-use Grafana). The live token
-does carry `alert.notifications.receivers.test:create`, confirming the
-CAPABILITY exists; the exact path and body shape below are this CLI's best
-reconstruction of Alertmanager's test-receiver contract, not a verified
-fact. If this 404s or 400s, that is the signal the shape is wrong — report
-it rather than assume the contact point is broken.
-
-Refuses before sending if the target has zero integrations: Grafana's test
-API would accept the call and deliver nothing, which looks exactly like
-success and defeats the entire point of testing. Use `--dry-run` to see
-the exact request this would send without sending it.
-
-**Arguments:** `target` (required)
-
-| Option | Description |
-| --- | --- |
-| `--message` | Summary text for the synthetic test alert. |
-
 ## `org`
 
-### `graf org check`
+### `grafana-cli org check`
 
 Does the active profile's recorded org match what its token actually is?
 
@@ -908,7 +883,7 @@ exception. Anything else (a flat-out bad token, a network failure) is a
 different problem with a different fix and is left to propagate as
 itself, exit code and all, rather than folded into this report.
 
-### `graf org current`
+### `grafana-cli org current`
 
 The org this token is scoped to, and who the token is.
 
@@ -927,7 +902,7 @@ would already have failed loudly as `OrgMismatch` before this command's
 own `/api/org` call ever returned. `org check` is the command that turns
 that failure into a report instead of an error.
 
-### `graf org list`
+### `grafana-cli org list`
 
 Every org this CLI can reach — NOT every org that exists on the server.
 
@@ -948,7 +923,7 @@ real answer regardless.
 
 ## `raw`
 
-### `graf raw delete`
+### `grafana-cli raw delete`
 
 DELETE an endpoint. Usually returns an empty body (-> `null`), not an object.
 
@@ -958,7 +933,7 @@ DELETE an endpoint. Usually returns an empty body (-> `null`), not an object.
 | --- | --- |
 | `--param`, `-P` | Query param key=value (repeatable). |
 
-### `graf raw get`
+### `grafana-cli raw get`
 
 GET an endpoint and print whatever it returns, unmodified.
 
@@ -973,7 +948,7 @@ Reads always execute — the global `--dry-run` only suppresses writes.
 | --- | --- |
 | `--param`, `-P` | Query param key=value (repeatable). |
 
-### `graf raw patch`
+### `grafana-cli raw patch`
 
 PATCH an endpoint with a partial JSON body. Preview any write with a global `--dry-run`.
 
@@ -985,7 +960,7 @@ PATCH an endpoint with a partial JSON body. Preview any write with a global `--d
 | `--data-file` | File containing the JSON body. |
 | `--param`, `-P` | Query param key=value (repeatable). |
 
-### `graf raw post`
+### `grafana-cli raw post`
 
 POST to an endpoint with a JSON body.
 
@@ -1000,7 +975,7 @@ creates or overwrites a dashboard. Preview any write with a global `--dry-run`.
 | `--data-file` | File containing the JSON body. |
 | `--param`, `-P` | Query param key=value (repeatable). |
 
-### `graf raw put`
+### `grafana-cli raw put`
 
 PUT a full JSON body to an endpoint. Preview any write with a global `--dry-run`.
 
@@ -1014,7 +989,7 @@ PUT a full JSON body to an endpoint. Preview any write with a global `--dry-run`
 
 ## `scan`
 
-### `graf scan`
+### `grafana-cli scan`
 
 Is this healthy? Find errors, panics and deprecations in one pass.
 
@@ -1032,7 +1007,7 @@ Is this healthy? Find errors, panics and deprecations in one pass.
 
 ## `server`
 
-### `graf server doctor`
+### `grafana-cli server doctor`
 
 Diagnose the server, the token, its org, and what it can actually do —
 in that order, because each rung isolates one failure before the next rung
@@ -1062,7 +1037,7 @@ read `status` in the JSON.
 | --- | --- |
 | `--exit-code` | Exit 21 if the report is not fully healthy. Default: always exit 0 — diagnosing a broken server correctly is still a SUCCESSFUL run of this command. |
 
-### `graf server health`
+### `grafana-cli server health`
 
 `GET /api/health` — unauthenticated database + version probe.
 
@@ -1070,7 +1045,7 @@ Needs no token, so it is what to run first when nothing else is working:
 does the URL even point at a live Grafana? (For the full diagnosis chain,
 including auth and permissions, use `server doctor`.)
 
-### `graf server version`
+### `grafana-cli server version`
 
 The Grafana server's version — from the same unauthenticated
 `/api/health` probe as `server health`, trimmed to the one field most
@@ -1078,17 +1053,17 @@ scripts actually want.
 
 ## `settings`
 
-### `graf settings path`
+### `grafana-cli settings path`
 
 Print the config file path.
 
-### `graf settings set-format`
+### `grafana-cli settings set-format`
 
 Set the default output format.
 
 **Arguments:** `fmt` (required)
 
-### `graf settings set-limit`
+### `grafana-cli settings set-limit`
 
 Set the default result limit.
 
@@ -1098,7 +1073,7 @@ accident waiting to happen — see `config.DEFAULT_LIMIT`.
 
 **Arguments:** `limit` (required)
 
-### `graf settings set-since`
+### `grafana-cli settings set-since`
 
 Set the default lookback window for logs/metrics queries.
 
@@ -1109,7 +1084,7 @@ and fails somewhere less obvious.
 
 **Arguments:** `since` (required)
 
-### `graf settings show`
+### `grafana-cli settings show`
 
 Show every setting, its value, and where it came from.
 

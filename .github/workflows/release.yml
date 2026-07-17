@@ -58,10 +58,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { os: ubuntu-latest,  asset: graf-linux-x86_64 }
-          - { os: macos-latest,   asset: graf-macos-arm64 }
-          - { os: macos-13,       asset: graf-macos-x86_64 }
-          - { os: windows-latest, asset: graf-windows-x86_64.exe }
+          - { os: ubuntu-latest,  asset: grafana-cli-linux-x86_64 }
+          - { os: macos-latest,   asset: grafana-cli-macos-arm64 }
+          - { os: macos-13,       asset: grafana-cli-macos-x86_64 }
+          - { os: windows-latest, asset: grafana-cli-windows-x86_64.exe }
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4

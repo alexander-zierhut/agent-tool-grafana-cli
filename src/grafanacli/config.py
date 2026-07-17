@@ -20,9 +20,9 @@ a token from org 1 sent with ``X-Grafana-Org-Id: 6`` gets a 401
 one. So "work with multiple organisations" cannot mean "switch org on a flag" —
 it means **one profile per org**, each with its own URL, token and org id::
 
-    graf auth login                      # -> profile "default", org 1
-    graf auth login --profile sales      # -> profile "sales",   org 6
-    graf -p sales logs sources
+    grafana-cli auth login                      # -> profile "default", org 1
+    grafana-cli auth login --profile sales      # -> profile "sales",   org 6
+    grafana-cli -p sales logs sources
 
 The consequence that bites, and the reason ``context`` is keyed by profile below:
 **datasource UIDs are per-org.** The same Loki is uid ``P1A2B…`` in org 1 and
@@ -212,7 +212,7 @@ class Config:
             if env_url:
                 return Profile(name=name, base_url=env_url, org_id=env_org)
             raise ConfigError(
-                f"no profile '{name}' configured. Run `graf auth login` "
+                f"no profile '{name}' configured. Run `grafana-cli auth login` "
                 f"or set GRAFANA_URL + GRAFANA_TOKEN."
             )
         return Profile(

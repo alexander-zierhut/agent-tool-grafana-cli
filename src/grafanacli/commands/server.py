@@ -1,4 +1,4 @@
-"""`graf server` — is this server healthy, whose token is speaking, and what can
+"""`grafana-cli server` — is this server healthy, whose token is speaking, and what can
 it actually do?
 
 `doctor` is the whole reason this module exists. Grafana collapses a lot of
@@ -75,7 +75,7 @@ def _open_client(obj) -> tuple[Client, str | None]:
     `AppContext.client()` refuses to build one without a token — correct for
     every other command, wrong here: `/api/health` is unauthenticated
     specifically so `server health`/`server doctor` can answer even before
-    `graf auth login` has ever run. That is the whole value of rung 1 (it
+    `grafana-cli auth login` has ever run. That is the whole value of rung 1 (it
     separates "wrong URL" from "bad token"), so this bypasses the normal gate.
     """
     prof = obj.config.resolve()
@@ -95,7 +95,7 @@ def _credential_report(obj, token: str | None) -> dict:
     """WHICH credential is actually speaking — the fact people lose the most
     time to. Precedence is env > keyring > file (deliberate — it is what makes
     CI work headless), so an exported `$GRAFANA_TOKEN`/`$GRAFANACLI_TOKEN`
-    silently outranks a keyring login done with `graf auth login`.
+    silently outranks a keyring login done with `grafana-cli auth login`.
     """
     out = {
         "backend": credentials.backend_name(),
@@ -107,7 +107,7 @@ def _credential_report(obj, token: str | None) -> dict:
     if hit:
         out["note"] = (
             f"authenticating with ${hit[0]}, NOT the keyring — the environment always wins. "
-            f"If you ran `graf auth login` and this doesn't look like that login, "
+            f"If you ran `grafana-cli auth login` and this doesn't look like that login, "
             f"`unset {hit[0]}` to fall back to the stored one."
         )
     return out
@@ -223,7 +223,7 @@ def probe_identity(client: Client) -> dict:
     except AuthError as exc:
         return {
             "check": "token", "ok": False, "diagnosis": "bad-token",
-            "message": f"the token was rejected (server said: {exc}). Get a fresh one with `graf auth login`.",
+            "message": f"the token was rejected (server said: {exc}). Get a fresh one with `grafana-cli auth login`.",
         }
     except OpError as exc:
         return {
@@ -294,7 +294,7 @@ def probe_org(client: Client, profile) -> dict:
             ok=False, diagnosis="org-mismatch",
             message=(
                 f"the profile is configured for org {configured}, but the token answers as org "
-                f"{actual_org} ({res.get('name')}). Re-running `graf auth login` with the SAME "
+                f"{actual_org} ({res.get('name')}). Re-running `grafana-cli auth login` with the SAME "
                 f"token fixes nothing here — mint a token in org {configured}, or point this "
                 f"profile at org {actual_org}."
             ),

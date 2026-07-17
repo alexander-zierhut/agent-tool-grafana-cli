@@ -1,4 +1,4 @@
-"""`graf dashboard` — find, read, and build dashboards.
+"""`grafana-cli dashboard` — find, read, and build dashboards.
 
 The commands here fall into two very different jobs, and it is worth being
 explicit about which one you are reaching for:
@@ -11,8 +11,8 @@ explicit about which one you are reaching for:
   yourself and work out which field holds the query and which datasource it
   runs against — two things that vary by datasource type and are not
   documented together anywhere. `panels` does that walk once and hands back
-  LogQL/PromQL you can paste straight into `graf logs query -q` or
-  `graf metrics query -q`. That turns "here is a dashboard" into "here is what
+  LogQL/PromQL you can paste straight into `grafana-cli logs query -q` or
+  `grafana-cli metrics query -q`. That turns "here is a dashboard" into "here is what
   it actually looks at", which is the more useful question when you inherited
   a dashboard and want to run its queries yourself, ad hoc, with a different
   window.
@@ -180,7 +180,7 @@ def panels(ctx: typer.Context, uid: str = typer.Argument(..., help="Dashboard UI
     alongside the datasource it runs against. Where the datasource type makes
     the query language unambiguous (`loki` -> LogQL, `prometheus` -> PromQL —
     Mimir/Thanos/Cortex all report as `prometheus`), a ready-to-run
-    `graf logs query` / `graf metrics query` command is included so you can
+    `grafana-cli logs query` / `grafana-cli metrics query` command is included so you can
     run the same query yourself with a different window, without first
     reverse-engineering which field in the target JSON is the query.
 
@@ -323,8 +323,8 @@ def create(
         if not query:
             raise ValidationError(
                 "--query/-q is required at least once when not using --file — pass the "
-                "LogQL/PromQL this dashboard should show. Run `graf logs sources` or "
-                "`graf metrics sources` first if you do not have one yet."
+                "LogQL/PromQL this dashboard should show. Run `grafana-cli logs sources` or "
+                "`grafana-cli metrics sources` first if you do not have one yet."
             )
         if panel_type not in _PANEL_TYPES:
             raise ValidationError(f"--panel-type must be one of {', '.join(_PANEL_TYPES)}, got {panel_type!r}.")
@@ -453,7 +453,7 @@ def _ds_ref(raw: Any) -> dict | None:
     API call per panel, which `panels` deliberately does not do (it would
     silently turn a single-request command into one request per panel on a
     dashboard with many) — so a bare-string datasource is reported with `uid:
-    None`, and the reader resolves it themselves with `graf datasource get
+    None`, and the reader resolves it themselves with `grafana-cli datasource get
     <name>` if they need to.
     """
     if isinstance(raw, dict):
@@ -478,9 +478,9 @@ def _suggest(ds: dict | None, query_text: Any) -> str | None:
         return None
     kind = (ds.get("type") or "").lower()
     if kind == "loki":
-        return f"graf logs query -q {shlex.quote(query_text)} --datasource {uid}"
+        return f"grafana-cli logs query -q {shlex.quote(query_text)} --datasource {uid}"
     if kind == "prometheus":
-        return f"graf metrics query -q {shlex.quote(query_text)} --datasource {uid}"
+        return f"grafana-cli metrics query -q {shlex.quote(query_text)} --datasource {uid}"
     return None
 
 

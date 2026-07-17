@@ -1,6 +1,6 @@
 """Fingerprinting, clustering and classification — hermetic.
 
-The engine behind `graf scan` and `graf logs similar`. Everything here is a pure
+The engine behind `grafana-cli scan` and `grafana-cli logs similar`. Everything here is a pure
 function from strings to data, so it is testable exactly, and it needs to be: a
 classifier that over-claims turns "any irregularities?" into a false alarm, and
 one that under-claims hides a panic.
