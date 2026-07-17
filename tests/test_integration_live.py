@@ -64,8 +64,13 @@ def test_permission_names_are_not_capability(live_client):
 
 
 def test_the_capability_that_actually_gates_discovery(live_client):
-    """`datasources:read` with a real scope is what makes `logs sources` possible.
-    If this ever comes back unscoped, discovery breaks and doctor must say why."""
+    """`datasources:read`, scoped, is what makes `logs sources` possible.
+
+    Note what this does NOT prove: which ROLE grants it. This assertion held on an
+    Admin token and was misread as evidence that discovery *needs* Admin — it does
+    not; a Viewer has this permission too. The role matrix is proven properly in
+    tests/test_roles_live.py, against a stack where we can mint all three roles.
+    """
     perms = live_client.get("/access-control/user/permissions")
     assert "datasources:*" in perms.get("datasources:read", [])
 
@@ -299,11 +304,18 @@ def test_we_always_send_the_unambiguous_encoding(live_client):
 
 
 @pytest.mark.needs_loki
-def test_detected_level_filters_but_is_not_an_indexed_label(live_client):
+def test_the_derived_level_label_filters_but_is_not_indexed(live_client):
     """Both halves of the derived-label trap, live:
-      1. `detected_level` is absent from /labels, yet
+      1. the level label is absent from /labels, yet
       2. it filters correctly as a pipeline stage.
-    This is why `build_query` puts level in the pipeline and never the selector."""
+    This is why `build_query` puts level in the pipeline and never the selector.
+
+    It also pins the portability fix. The label is `level` on Loki 3.0.0 and
+    `detected_level` on newer builds — measured on two different servers — so
+    `build_query` unions both names. This test runs against WHICHEVER Loki you
+    point it at, which is the point: it passes on the throwaway 3.0 stack and on a
+    newer production one, and would fail on either if we hardcoded one name.
+    """
     window = TimeRange.resolve(since="1h")
     ds = _first_loki(live_client)
     try:
@@ -313,7 +325,8 @@ def test_detected_level_filters_but_is_not_an_indexed_label(live_client):
     if not labels:
         pytest.skip("no labels to build a query from")
 
-    assert "detected_level" not in labels, "detected_level must NOT be an indexed label"
+    for name in loki.LEVEL_LABELS:
+        assert name not in labels, f"{name} must NOT be an indexed label"
 
     query = loki.build_query({}, level="error", match_all_label=labels[0])
     start, end = window.loki()
@@ -323,7 +336,10 @@ def test_detected_level_filters_but_is_not_an_indexed_label(live_client):
     ))
     if not records:
         pytest.skip("no error-level logs in the last hour")
-    assert all(r["labels"].get("detected_level") == "error" for r in records)
+    # Whichever name this server uses, every returned line must really be error.
+    for r in records:
+        got = {r["labels"].get(n) for n in loki.LEVEL_LABELS} - {None}
+        assert got == {"error"}, f"level filter returned a non-error line: {r['labels']}"
 
 
 # ---- alerting --------------------------------------------------------

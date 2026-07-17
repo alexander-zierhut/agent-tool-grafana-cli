@@ -76,7 +76,13 @@ def test_a_plain_401_is_still_an_autherror():
 
 def test_403_names_the_permission_and_what_it_costs_you():
     """Grafana buries the only useful part -- the permission name -- at the end of
-    a sentence that says nothing else. Live body, copied verbatim."""
+    a sentence that says nothing else. Live body, copied verbatim.
+
+    This test used to assert the hint said "Admin". It did, and it was WRONG: a
+    Viewer lists datasources perfectly well (measured -- see
+    tests/test_roles_live.py). The hint now says what a missing `datasources:read`
+    actually implies, which is custom RBAC rather than a role mistake.
+    """
     with pytest.raises(AuthError) as e:
         Client._raise_for_error(_resp(403, {
             "accessErrorId": "ACE3392348646",
@@ -85,16 +91,39 @@ def test_403_names_the_permission_and_what_it_costs_you():
         }))
     msg = str(e.value)
     assert "datasources:read" in msg
-    assert "Admin" in msg, "must say which role fixes it"
     assert "logs sources" in msg, "must say what it costs you"
+    assert "Viewer up has it" in msg, "must not send people to escalate to Admin"
+
+
+def test_403_on_a_write_names_the_role_that_grants_it():
+    """The permissions that DO gate on role. Editor, not Admin -- measured."""
+    for needed, expect in (
+        ("alert.rules:create", "Editor"),
+        ("alert.notifications.receivers:write", "Editor"),
+        ("dashboards:create", "Editor"),
+    ):
+        hint = _permission_hint(
+            f"You'll need additional permissions to perform this action. Permissions needed: {needed}"
+        )
+        assert needed in hint
+        assert expect in hint, f"{needed} must name the role that grants it"
+
+
+def test_alert_rule_hint_says_the_permission_is_folder_scoped():
+    """A token that writes rules in one folder and is refused in another looks
+    like a flaky permission unless you know scoping exists."""
+    hint = _permission_hint(
+        "You'll need additional permissions to perform this action. Permissions needed: alert.rules:create"
+    )
+    assert "FOLDER" in hint.upper()
 
 
 def test_permission_hint_generalises_to_permissions_we_have_not_met():
     hint = _permission_hint(
         "You'll need additional permissions to perform this action. "
-        "Permissions needed: alert.notifications.config-history:read"
+        "Permissions needed: some.future.permission:read"
     )
-    assert hint == "your token lacks the alert.notifications.config-history:read permission."
+    assert hint == "your token lacks the some.future.permission:read permission."
 
 
 def test_permission_hint_ignores_unrelated_prose():

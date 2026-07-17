@@ -1,4 +1,4 @@
-.PHONY: help install test test-unit lint docs clean
+.PHONY: help install test test-unit lint docs clean stack stack-down stack-env
 
 PY ?= python3
 VENV ?= .venv
@@ -11,8 +11,18 @@ install: ## Create a venv and install the CLI (editable, with test deps)
 	$(PY) -m venv $(VENV)
 	. $(VENV)/bin/activate && pip install -q -e '.[test]'
 
-test: ## Run the full suite (integration tests need GRAFANA_URL + GRAFANA_TOKEN; they skip without)
-	. $(VENV)/bin/activate && python -m pytest
+test: ## Run the full suite against the throwaway stack (boots it if needed)
+	$(MAKE) stack
+	. $(VENV)/bin/activate && eval "$$(./scripts/bootstrap_test_stack.sh --export)" && python -m pytest
+
+stack: ## Boot Grafana + Loki + Prometheus for testing
+	docker compose up -d --wait
+
+stack-down: ## Tear the test stack down, volumes and all
+	docker compose down -v
+
+stack-env: ## Print the env for the running stack: eval "$$(make -s stack-env)"
+	@./scripts/bootstrap_test_stack.sh --export 2>/dev/null
 
 test-unit: ## Run the hermetic tests (no server, no Docker, no token, ~2s)
 	# The MARKER is the source of truth, never a file list. The sibling

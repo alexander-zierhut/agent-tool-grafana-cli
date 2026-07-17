@@ -90,19 +90,40 @@ stops being tested.
 ## Tests
 
 ```bash
-make test-unit     # hermetic; the marker, never a file list
-make test          # + live read-only tests (skip without GRAFANA_URL/GRAFANA_TOKEN)
+make test-unit     # hermetic (268 tests, ~2s); the marker, never a file list
+make stack         # boot Grafana + Loki + Prometheus
+make test          # boots + seeds + runs EVERYTHING (321 tests)
+make stack-down    # tear it down, volumes and all
 make docs          # regenerate docs/COMMANDS.md; CI fails if it drifts
 ```
 
-- **Live tests are READ-ONLY, and that is a hard rule.** They run against a
-  production instance. Nothing creates, updates or deletes — write paths are
-  proven with `--dry-run` in the hermetic tier. A suite that mutates production is
-  a suite people stop running, and then it protects nothing.
+**Test against our own stack, never against somebody's production.** This is the
+rule that shapes the rest. An earlier CI pointed at the maintainer's real Grafana
+behind repository secrets: it could not run on a fork's PR, could only ever read,
+and "passed" by skipping everywhere else — while the CLI's whole write surface
+(create a dashboard, create an alert rule, watch it fire into a receiver that
+cannot deliver) went untested. `docker-compose.yml` + `scripts/bootstrap_test_stack.sh`
+boot and seed a throwaway stack in ~30s with no credentials.
+
+- **The write tier is interlocked.** Destructive tests require
+  `GRAFANA_ALLOW_WRITES=1`, which only the bootstrap script sets, and it only ever
+  talks to a throwaway stack. Point the suite at a real Grafana and the write
+  tests cannot run. There is a meta-test asserting the interlock is armed — an
+  interlock nobody checks is decoration, and it has already caught one real
+  failure (`_hermetic` stripped `GRAFANA_URL` while leaving the interlock on, so
+  the whole live suite skipped itself and went green).
+- **`conftest._hermetic` strips the environment, so live tests must read
+  `conftest.live_env`,** which is a snapshot taken before the fixture ran.
+  `os.environ["GRAFANA_URL"]` is empty inside any test body.
 - The hermetic tests use a **hand-rolled fake client**, not a transport mock. A
   transport mock tempts you into simulating the API, and the API is wrong in ways
   you would encode wrongly. What the server really does belongs in the live tier,
-  where the server can contradict you.
+  where the server can contradict you — and has: three separate claims in this
+  repo were disproved by tests written to confirm them.
+- **The seeded stack is deliberate, not arbitrary.** Label cardinality is 3/2/1 so
+  `logs sources` has a useless label to report; ids in the seeded logs are non-hex
+  because Docker Swarm ids broke fingerprinting for real; one datasource points at
+  a dead port so exit 8 is proven by a real 502.
 - **A doc that names a command is tested against the real tree**
   (`tests/test_guide_unit.py`). Prose makes promises nothing executes: a sibling
   shipped a `guide` advertising a command that never existed, and a SKILL.md
@@ -124,6 +145,19 @@ make docs          # regenerate docs/COMMANDS.md; CI fails if it drifts
   one problem: every line carried a Docker Swarm `task.id`, and those ids are
   base32-ish, not hex, so the `<HEX>` rule could not touch them. Modern
   orchestrators do not emit hex ids. Hence `<ID>`.
+- **"Listing datasources needs org Admin"** was written in the findings file, the
+  README, the guide, the `auth login` prompt and the 403 hint. It was reasoned,
+  never measured, and **false** — a Viewer enumerates fine; only writes need
+  Editor. It survived a spike, a review and six agents, and it was talking users
+  into granting a CLI org-administration rights it never uses. One
+  `docker compose up` disproved it. Over-privilege by documentation is a security
+  bug. The matrix is now `tests/test_roles_live.py`, not prose.
+- **The derived level label is called `level` on Loki 3.0 and `detected_level` on
+  newer builds.** Hardcoding either returns an empty *success* on the other. We
+  union both. Found only because CI boots a Loki that differs from production.
+- Service-account **token names must be unique per ORG**, not per account
+  (`serviceaccounts.ErrTokenAlreadyExists`). The bootstrap silently emitted empty
+  tokens until it started failing loudly.
 - `UID` is a **readonly** shell variable. Probing `/uid/$UID/` silently asks about
   uid 1000. It is documented in the findings file and it still caught the author
   a second time. Use another name.

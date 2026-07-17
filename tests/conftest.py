@@ -20,6 +20,19 @@ from pathlib import Path
 
 import pytest
 
+#: The environment as it was BEFORE any fixture touched it.
+#:
+#: Snapshotted at import, and that is the whole trick: `_hermetic` is autouse and
+#: strips every variable that could reach a real server, so by the time a live
+#: test runs `os.environ["GRAFANA_URL"]` is gone. Live tests read this instead.
+#:
+#: Getting it wrong is not a small bug. The first version stripped the URL while
+#: leaving `GRAFANA_ALLOW_WRITES` set, so an entire live suite skipped itself
+#: ("GRAFANA_URL is not set") while the write interlock stayed armed — the exact
+#: invisible-URL/live-writes state that tests/test_roles_live.py refuses. The
+#: interlock caught it; nothing else would have.
+_ORIGINAL_ENV = dict(os.environ)
+
 #: Every variable that could steer the CLI at a real server or a real token.
 #: Listed exhaustively rather than prefix-matched: `GRAFANA_URL` does not share a
 #: prefix with `GRAFANACLI_URL`, and a prefix sweep would miss exactly the
@@ -28,6 +41,19 @@ _LEAKY_VARS = (
     "GRAFANA_URL",
     "GRAFANA_TOKEN",
     "GRAFANA_ORG_ID",
+    # Seeded by scripts/bootstrap_test_stack.sh. Stripped for the same reason as
+    # the rest: a hermetic test must behave identically on a laptop with the
+    # throwaway stack running and on a clean CI runner.
+    "GRAFANA_TOKEN_EDITOR",
+    "GRAFANA_TOKEN_VIEWER",
+    "GRAFANA_TOKEN_ORG2",
+    "GRAFANA_TOKEN_ORG6",
+    "GRAFANA_ALLOW_WRITES",
+    "GRAFANA_ORG2_ID",
+    "GRAFANA_TEST_FOLDER",
+    "GRAFANA_TEST_LOKI_UID",
+    "GRAFANA_TEST_PROM_UID",
+    "GRAFANA_TEST_DEAD_UID",
     "GRAFANACLI_URL",
     "GRAFANACLI_TOKEN",
     "GRAFANACLI_ORG_ID",
@@ -39,6 +65,15 @@ _LEAKY_VARS = (
     "GRAFANACLI_STREAM",
     "GRAFANACLI_NO_CONTEXT",
 )
+
+
+def live_env(name: str, default: str = "") -> str:
+    """Read a live-stack variable from the pre-fixture snapshot, then `.env`.
+
+    Never `os.environ`: `_hermetic` has already emptied it by the time any test
+    body runs.
+    """
+    return _ORIGINAL_ENV.get(name) or _dotenv().get(name, default)
 
 
 @pytest.fixture(autouse=True)
@@ -76,14 +111,15 @@ def _dotenv() -> dict[str, str]:
 
 
 def _live_config() -> dict[str, str]:
-    """Live credentials from the environment, falling back to .env."""
-    env = _dotenv()
+    """Live credentials, from the pre-fixture snapshot then .env."""
     return {
-        "url": os.environ.get("GRAFANA_URL") or env.get("GRAFANA_URL", ""),
-        "token": os.environ.get("GRAFANA_TOKEN") or env.get("GRAFANA_TOKEN", ""),
+        "url": live_env("GRAFANA_URL"),
+        "token": live_env("GRAFANA_TOKEN"),
         # The second org's token. Its absence skips only the multi-org tests,
-        # never the rest -- most contributors will have one org at most.
-        "token_org2": os.environ.get("GRAFANA_TOKEN_ORG6") or env.get("GRAFANA_TOKEN_ORG6", ""),
+        # never the rest -- a contributor may well have one org.
+        # GRAFANA_TOKEN_ORG2 is what the throwaway stack emits; GRAFANA_TOKEN_ORG6
+        # is the maintainer's .env name for a real second org. Either works.
+        "token_org2": live_env("GRAFANA_TOKEN_ORG2") or live_env("GRAFANA_TOKEN_ORG6"),
     }
 
 
@@ -93,7 +129,9 @@ def live() -> dict:
     if not cfg["url"] or not cfg["token"]:
         pytest.skip(
             "no live Grafana configured. Set GRAFANA_URL + GRAFANA_TOKEN (a "
-            "service-account token with the Admin role) to run integration tests."
+            "service-account token; Editor is enough) to run integration tests. "
+            "Or boot the throwaway stack: docker compose up -d && "
+            "./scripts/bootstrap_test_stack.sh"
         )
     return cfg
 

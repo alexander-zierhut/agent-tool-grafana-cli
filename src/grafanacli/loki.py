@@ -9,12 +9,18 @@ Three facts drive the design, all verified live against the instance in
 1. **A stream selector cannot be empty.** ``{}`` is a parse error in Loki, so
    "give me everything" has to be spelled with a real matcher. We use
    ``{<some-label>=~".+"}`` and pick the label deliberately — see `match_all`.
-2. **`detected_level` is not a stream label.** It does not appear in ``/labels``,
-   yet it comes back on every stream and *does* filter — because Loki derives it
-   at query time. That means it is legal in a **pipeline stage**
-   (``{job=~".+"} | detected_level="error"``) and illegal in the **selector**
-   (``{detected_level="error"}`` matches nothing). The distinction is invisible in
-   the docs and is the whole reason `level=` is threaded separately below.
+2. **The derived level label is not a stream label, and its NAME depends on the
+   Loki version.** It does not appear in ``/labels``, yet it comes back on every
+   stream and *does* filter — because Loki derives it at query time. So it is
+   legal in a **pipeline stage** (``{job=~".+"} | detected_level="error"``) and
+   illegal in the **selector** (``{detected_level="error"}`` matches nothing).
+
+   Worse, measured across two servers: **Loki 3.0.0 derives ``level``; newer Loki
+   derives ``detected_level``.** Hardcoding either silently returns an empty
+   success on the other — the failure that is indistinguishable from "there are no
+   errors". `build_query` therefore emits **both, unioned**
+   (``| detected_level="error" or level="error"``), which is verified to work on
+   both and to stay correct: a level that exists on neither still returns nothing.
 3. **Label cardinality is the useful signal, not label names.** Two of the four
    labels on the live instance have exactly one value, so "you can filter on
    `job`" is worthless advice. Callers get counts.
@@ -30,10 +36,15 @@ from agentcli.errors import ValidationError
 #: Loki's operators for a stream matcher.
 MATCH_OPS = ("=~", "!~", "!=", "=")
 
-#: Levels Loki's own `detected_level` derivation emits. Anything outside this set
-#: is still passed through -- the list is for validation hints and `--level`
-#: completion, not a gate, because Loki adds to it between versions.
+#: Levels Loki's own level derivation emits. Anything outside this set is still
+#: passed through -- the list is for validation hints and `--level` completion,
+#: not a gate, because Loki adds to it between versions.
 KNOWN_LEVELS = ("trace", "debug", "info", "warn", "error", "fatal", "critical", "unknown")
+
+#: The names Loki gives the level it derives at query time, newest first.
+#: MEASURED, not read: Loki 3.0.0 emits `level`, later builds emit
+#: `detected_level`, and neither appears in `/labels`. We filter on both.
+LEVEL_LABELS = ("detected_level", "level")
 
 
 def escape_value(value: str) -> str:
@@ -124,8 +135,20 @@ def build_query(
     if level:
         # NOT `{detected_level="error"}` -- that matches nothing, because Loki
         # derives the label at query time and it is absent from the index.
-        q += f' | detected_level="{escape_value(level)}"'
+        #
+        # Both names, unioned, because the derived label is called `level` on Loki
+        # 3.0 and `detected_level` on newer builds (both measured). A stream that
+        # lacks one simply fails that half of the `or`; a level that exists on
+        # neither still returns nothing. So the union costs an unmatched clause
+        # and buys portability across every Loki anyone is running.
+        q += f' | {level_filter(level)}'
     return q
+
+
+def level_filter(level: str) -> str:
+    """The pipeline expression that matches *level* on any Loki version."""
+    value = escape_value(level)
+    return " or ".join(f'{name}="{value}"' for name in LEVEL_LABELS)
 
 
 def _validate_regex(pattern: str) -> None:

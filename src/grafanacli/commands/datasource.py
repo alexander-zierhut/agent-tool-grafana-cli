@@ -9,7 +9,7 @@ walk) already lives there and is already tested without a server.
 Two things every command here has to respect, both earned live against this
 instance:
 
-* **`GET /api/datasources` needs org Admin** (`datasources:read`). An Editor
+* **`GET /api/datasources` needs `datasources:read`** — which Viewer already has. An Editor
   token can query a datasource it already knows the uid of, but cannot
   enumerate them — so `list` (and anything built on `sources.list_datasources`)
   is simply unavailable to a lower-privileged token, and the failure has to
@@ -42,7 +42,7 @@ _LIST_COLUMNS = [
 def list_(ctx: typer.Context) -> None:
     """Every datasource in this org, classified by what this CLI can do with it.
 
-    Needs org Admin (`datasources:read`) — see the module docstring. `logs`/
+    Needs `datasources:read`, which Viewer already has — see the module docstring. `logs`/
     `metrics` are `"supported"` (this CLI can query it), `"recognised"` (it is
     a known log/metric-capable type, e.g. Elasticsearch, but not implemented
     here yet), or `null` (neither — a plugin datasource, or one that is

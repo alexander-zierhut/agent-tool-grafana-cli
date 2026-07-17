@@ -17,8 +17,8 @@ What is Grafana-shaped here:
   empty body**. Conflating the two is how you get a JSONDecodeError instead of an
   error message.
 * **Errors name the permission they need.** Grafana 403 bodies carry
-  ``"Permissions needed: datasources:read"``, which is far more actionable than
-  "forbidden" — so we surface it rather than flatten it.
+  ``"Permissions needed: alert.rules:create"``, which is far more actionable than
+  "forbidden" — so we surface it, and name the role that grants it.
 * **Pagination is per-endpoint, not global.** ``/api/search`` takes page+limit;
   the provisioning API returns everything at once; Loki has its own ``limit``.
   There is no single ``paginate()`` that is correct for Grafana, so there isn't
@@ -355,14 +355,37 @@ def _permission_hint(msg: Any) -> str | None:
     if not isinstance(msg, str) or "Permissions needed:" not in msg:
         return None
     needed = msg.split("Permissions needed:", 1)[1].strip().rstrip(".")
-    # Verified live: this exact permission is what separates an Editor token
-    # (which can query a datasource it already knows) from an Admin token (which
-    # can discover which datasources exist at all).
+
+    # The role each permission needs, MEASURED against Grafana 13.0.3 rather than
+    # reasoned about. This table exists because the reasoning was wrong: the first
+    # version of this function announced that `datasources:read` meant org Admin
+    # and that an Editor could not discover datasources. Both false — a **Viewer**
+    # lists datasources fine. Only the write permissions actually gate anything.
+    # tests/test_roles_live.py pins every row against a real server.
     if needed.startswith("datasources:read"):
         return (
-            f"your token lacks {needed}, which is what listing datasources requires "
-            f"(org Admin by default). It can still query a datasource by uid — but it "
-            f"cannot discover them, so `logs sources` cannot work. Mint the service "
-            f"account with the Admin role."
+            f"your token lacks {needed}, which is what listing datasources requires. "
+            f"That is unusual — on Grafana OSS every basic role from Viewer up has it "
+            f"by default — so this token is probably restricted by custom RBAC. "
+            f"Without it `logs sources` cannot work: you can query a datasource whose "
+            f"uid you already know, but not discover which exist."
+        )
+    if needed.startswith("alert.rules:"):
+        return (
+            f"your token lacks {needed}. Creating or editing alert rules needs the "
+            f"**Editor** role (Viewer cannot), and the permission is scoped PER "
+            f"FOLDER — so a token that can write rules in one folder still cannot in "
+            f"another. `graf server doctor` lists the folders yours can write to."
+        )
+    if needed.startswith("alert.notifications"):
+        return (
+            f"your token lacks {needed}. Managing contact points and notification "
+            f"policies needs the **Editor** role; a Viewer can read them but not "
+            f"change them."
+        )
+    if needed.startswith("dashboards:"):
+        return (
+            f"your token lacks {needed}. Creating or editing dashboards needs the "
+            f"**Editor** role, and it is scoped per folder."
         )
     return f"your token lacks the {needed} permission."

@@ -1,0 +1,81 @@
+# A complete, throwaway Grafana stack for testing — the one CI boots.
+#
+# WHY THIS EXISTS. The integration tests need a Grafana that can be *written* to:
+# created dashboards, created alert rules, a contact point deliberately left
+# hollow, two organisations. None of that can be exercised against somebody's
+# real instance, so a CLI tested only against production is a CLI whose entire
+# write surface is tested by `--dry-run` and hope.
+#
+# It is also the contributor promise's escape hatch: `make test-unit` needs none
+# of this, but anyone who wants the full suite gets it with one command and no
+# credentials to beg for.
+#
+#   docker compose up -d && ./scripts/bootstrap_test_stack.sh
+#
+# Versions are PINNED, and grafana matches the instance the spike measured
+# (13.0.3) so `spike/VERIFIED_FINDINGS.md` and CI cannot silently disagree about
+# what the API does. Bump them deliberately, together, and re-read the findings.
+services:
+  loki:
+    image: grafana/loki:3.0.0
+    # The image ships this config; single-binary, filesystem-backed, no auth.
+    # `auth_enabled: false` in it means Loki serves the "fake" tenant, which is
+    # exactly the single-tenant shape we want here -- the real instance's
+    # per-org tenant scoping is done by a proxy in front of Loki, and that proxy
+    # is not what these tests are testing.
+    command: -config.file=/etc/loki/local-config.yaml
+    ports:
+      - "3100:3100"
+    healthcheck:
+      # /ready is Loki's own readiness gate; it stays 503 while the ingester
+      # warms up, and a query against a warming ingester returns an empty
+      # success -- indistinguishable from "no logs", which is the failure this
+      # whole tool exists to avoid. Wait properly.
+      test: ["CMD-SHELL", "wget -q -O- http://localhost:3100/ready | grep -q ready"]
+      interval: 3s
+      timeout: 3s
+      retries: 40
+
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    # Grafana's `prometheus` datasource type covers Mimir/Thanos/Cortex too --
+    # they all speak PromQL, which is what the CLI actually depends on. Testing
+    # against vanilla Prometheus therefore tests the contract, and skips running
+    # a Mimir cluster to prove a query language we already know is shared.
+    ports:
+      - "9090:9090"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://localhost:9090/-/ready | grep -q Ready"]
+      interval: 3s
+      timeout: 3s
+      retries: 40
+
+  grafana:
+    image: grafana/grafana:13.0.3
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      # Off on purpose: the bootstrap script drives the real HTTP API instead.
+      # Provisioning files would seed datasources by a path the CLI never uses,
+      # and would quietly diverge from how a human actually creates one.
+      GF_INSTALL_PLUGINS: ""
+      # Deterministic, so a test can assert on it.
+      GF_USERS_DEFAULT_THEME: light
+    ports:
+      # 3900, not 3000: a developer running this is quite likely to already have
+      # something on Grafana's default port, and a silent connection to the wrong
+      # server is a worse first experience than a port they have to look up.
+      - "3900:3000"
+    depends_on:
+      loki:
+        condition: service_healthy
+      prometheus:
+        condition: service_healthy
+    healthcheck:
+      # /api/health is unauthenticated (verified live) -- which is exactly why it
+      # is the right readiness probe, and the first rung of `graf server doctor`.
+      test: ["CMD-SHELL", "wget -q -O- http://localhost:3000/api/health | grep -q '\"database\": *\"ok\"'"]
+      interval: 3s
+      timeout: 3s
+      retries: 40

@@ -32,35 +32,59 @@ jobs:
       - name: Unit tests (no server, no network)
         run: python -m pytest -m "not integration" -q
 
-  # Live, READ-ONLY tests against a real Grafana.
+  # The full suite against a real Grafana + Loki + Prometheus, booted here.
   #
-  # Deliberately NOT run on pull_request: the only instance available is a
-  # production one, a fork's PR must never reach it, and `pull_request` cannot
-  # read secrets from a fork anyway — so it would "pass" by skipping, which is
-  # worse than not running. Push-to-main and manual dispatch only.
+  # NO SECRETS, and that is the design. An earlier version of this job pointed at
+  # the maintainer's production Grafana behind repository secrets, which meant it
+  # could not run on a pull request (a fork cannot read secrets, and must never
+  # reach production anyway), could only ever be read-only, and "passed" by
+  # skipping everywhere else. A job that mostly skips is a job that protects
+  # nothing.
   #
-  # The `if` gates on a secret being present so the job is a no-op (not a
-  # failure) in a clone that has none. Everything it runs is read-only by
-  # construction: see the module docstring in tests/test_integration_live.py.
-  # Write paths are covered by --dry-run in the hermetic tier.
+  # Booting our own stack instead means PRs from forks get the same coverage as
+  # main, and the tests can WRITE: create dashboards, create alert rules, watch a
+  # real rule fire into a receiver that cannot deliver. That write half is most of
+  # the CLI, and against somebody's production it is untestable by construction.
   integration:
-    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - run: pip install -e '.[test]'
-      - name: Live read-only tests (skips cleanly without secrets)
-        env:
-          GRAFANA_URL: ${{ secrets.GRAFANA_URL }}
-          GRAFANA_TOKEN: ${{ secrets.GRAFANA_TOKEN }}
-          # A token from a SECOND org. Without it the multi-org tests skip —
-          # they are the ones that prove tokens cannot cross orgs, which is the
-          # assumption the whole profile-per-org design rests on.
-          GRAFANA_TOKEN_ORG6: ${{ secrets.GRAFANA_TOKEN_ORG2 }}
-        run: python -m pytest -m integration -q -rs
+
+      - name: Boot Grafana + Loki + Prometheus
+        run: docker compose up -d --wait
+
+      - name: Seed orgs, roles, datasources, logs and alerts
+        # Writes the whole test environment to $GITHUB_ENV, including
+        # GRAFANA_ALLOW_WRITES — the interlock that lets the destructive tests run
+        # here and nowhere else.
+        run: ./scripts/bootstrap_test_stack.sh
+
+      - name: Full suite (hermetic + live + roles + writes)
+        # No `-m` filter: the whole point of booting a real stack is to run
+        # EVERYTHING against it.
+        run: python -m pytest -q -rs
+
+      - name: Fail if the live tiers silently skipped
+        # A skipped live test is indistinguishable from a passing one in the
+        # summary line, so a broken bootstrap would show up as a green run that
+        # tested nothing. Assert the tiers actually executed.
+        run: |
+          python -m pytest -m integration -q --collect-only | tail -1
+          python -m pytest -m integration -q -rs 2>&1 | tee /tmp/live.log
+          if grep -qE "^SKIPPED|s +\[" /tmp/live.log; then
+            echo "::error::live tests skipped despite a booted stack — the bootstrap is broken"
+            grep "SKIPPED" /tmp/live.log || true
+            exit 1
+          fi
+
+      - name: Dump logs on failure
+        if: failure()
+        run: docker compose logs --tail=80
 
   # Verify the distributables build and actually run.
   build:

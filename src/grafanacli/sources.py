@@ -34,10 +34,11 @@ from .timerange import TimeRange
 def list_datasources(client) -> list[dict]:
     """Every datasource in this org.
 
-    Needs ``datasources:read`` (org Admin by default). The client turns the 403
-    into a message that names the permission and says what it costs you, because
-    "forbidden" here means "discovery is impossible" and the reader deserves to
-    know which of the two they hit.
+    Needs ``datasources:read``, which **every basic role from Viewer up has by
+    default** — measured, not assumed (an earlier version of this docstring claimed
+    org Admin, and was wrong). A 403 here therefore means custom RBAC, and the
+    client turns it into a message that says so: "forbidden" here means "discovery
+    is impossible", and the reader deserves to know which of the two they hit.
     """
     data = client.get("/datasources")
     return data if isinstance(data, list) else []

@@ -146,7 +146,8 @@ output looks wrongly scoped, run `graf context show` or pass `--no-context`.
 - A firing Grafana alert with zero notification integrations notifies NOBODY.
   `graf alert route` / `graf notify check` say so explicitly; a bare "firing"
   status in `graf alert firing` does not mean anyone was told.
-- Listing datasources needs org Admin. An Editor token can query a datasource
+- Listing datasources needs `datasources:read`, which Viewer has. Only WRITES
+  need Editor. An Editor token can query a datasource
   it already knows the uid of, but `graf logs sources` — discovery — needs
   Admin; that is why `graf auth login` asks for an Admin-role token.
 

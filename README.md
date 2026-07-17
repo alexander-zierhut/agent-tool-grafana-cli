@@ -16,8 +16,35 @@ pip install -e '.[test]' && pytest
 ```
 
 Green on a clean checkout. **No Docker, no Grafana, no token, no network** — the
-hermetic suite runs in about two seconds. Live tests skip themselves unless you
-point them at a real server; a missing token is the normal case, not a failure.
+hermetic tier (268 tests) runs in about two seconds. Live tests skip themselves
+unless you point them at a server; a missing token is the normal case, not a
+failure.
+
+Want the other 53? Boot a throwaway Grafana + Loki + Prometheus:
+
+```bash
+make test          # boots the stack, seeds it, runs everything
+```
+
+or by hand:
+
+```bash
+docker compose up -d --wait
+eval "$(./scripts/bootstrap_test_stack.sh --export)"
+pytest
+```
+
+The stack is what CI runs, with **no secrets** — so a fork's pull request gets
+exactly the same coverage as `main`. It seeds two orgs, one service account per
+role, a Loki with deliberate label cardinality, a datasource whose backend is
+dead (to prove exit 8 against a real 502), and an alert rule that fires into a
+receiver that cannot deliver. That last one is not contrived: **a fresh Grafana
+org ships a default contact point named `empty` with zero integrations**, so out
+of the box every alert it raises notifies nobody.
+
+Tests that write are gated behind `GRAFANA_ALLOW_WRITES=1`, which only the
+bootstrap script sets. Point the suite at a real Grafana and it physically cannot
+reach the write tier.
 
 ## What it's for
 
@@ -100,11 +127,22 @@ re-running `auth login` with the same token cannot fix it.
 
 ## Requirements
 
-A **service account token with the Admin role** (`<your-grafana>/org/serviceaccounts`).
-Admin is not gratuitous: listing datasources needs `datasources:read`, which is org
-Admin by default. An Editor token can query a datasource whose uid it already knows
-but cannot discover any — which is the whole point of the tool. `graf server doctor`
-reports exactly what your token can do.
+A **service account token** (`<your-grafana>/org/serviceaccounts`). Which role you
+need depends only on whether you intend to write — measured against Grafana 13.0.3
+and pinned by `tests/test_roles_live.py`:
+
+| role | discover & read logs/metrics | create dashboards, alerts, contact points |
+|---|---|---|
+| **Viewer** | ✅ everything | ❌ 403 |
+| **Editor** | ✅ everything | ✅ everything |
+| Admin | same as Editor | same as Editor |
+
+So: **Viewer for read-only** (`scan`, `logs`, `metrics`, `alert route`), **Editor**
+to create anything. **Admin buys this CLI nothing** — don't hand out more than you
+need. `graf server doctor` reports what your token can actually do, with scopes.
+
+Note that alert-rule and dashboard permissions are **scoped per folder**, so an
+Editor token can write in one folder and be refused in another. Doctor lists which.
 
 Works against Grafana with **Loki** (logs) and **Prometheus/Mimir/Thanos/Cortex**
 (metrics). Verified against Grafana 13.0.3.

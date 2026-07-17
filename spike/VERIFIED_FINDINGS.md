@@ -9,9 +9,28 @@ Trust this file over the docs. Every line below was observed, not read.
 - `GET /api/user` → 200 returns the SA identity:
   `{"id":0,"uid":"service-account:N","login":"sa-1-<name>","orgId":1,"isGrafanaAdmin":false,…}`
   - **`id` is 0 and `isGrafanaAdmin` is false for a service account** — do NOT use either to decide capability.
-    Our token can still list datasources, because that needs the **org Admin role**, which is
-    different from `isGrafanaAdmin` (server admin). Use `/api/access-control/user/permissions` to
-    know what you can actually do, not the `isGrafanaAdmin` flag.
+    Use `/api/access-control/user/permissions` to know what you can actually do, not the
+    `isGrafanaAdmin` flag (which is *server* admin, a different thing from *org* admin).
+
+### THE ROLE MATRIX — measured, and it corrected a wrong claim
+This file previously asserted that listing datasources "needs the **org Admin role**". **That was
+wrong**, and it had already propagated into the README, the guide, the `auth login` prompt and the
+403 hint before a throwaway stack disproved it. Measured on Grafana 13.0.3 with three real
+service-account tokens (`docker-compose.yml` + `scripts/bootstrap_test_stack.sh`, pinned by
+`tests/test_roles_live.py`):
+
+| role | `GET /api/datasources` | query logs (proxy) | dashboard create | alert-rule create | contact-point create |
+| --- | --- | --- | --- | --- | --- |
+| **Viewer** | 200 | 200 | 403 | 403 | 403 |
+| **Editor** | 200 | 200 | **200** | **201** | **202** |
+| **Admin** | 200 | 200 | 200 | 201 | 202 |
+
+So: **Viewer discovers and reads everything. Editor adds every write this CLI performs. Admin adds
+nothing.** Recommending Admin was not a harmless over-spec — it talked users into granting a CLI org
+administration it never uses.
+
+Note also `alert.rules:*` and `dashboards:*` are scoped **per folder**: an Editor may write in one
+folder and be refused in another.
 - `GET /api/health` → 200 `{"database":"ok","version":"13.0.3","commit":"NA"}` — **unauthenticated**, the
   right reachability/version probe (analogous to Drone's `/version`).
 
@@ -22,7 +41,7 @@ Trust this file over the docs. Every line below was observed, not read.
 | `GET /api/user` | 200 — the SA identity |
 | `GET /api/org` | 200 |
 | `GET /api/access-control/user/permissions` | 200 — **the honest capability probe** |
-| `GET /api/datasources` | 200 (needs `datasources:read` = org **Admin** by default) |
+| `GET /api/datasources` | 200 (needs `datasources:read` — **Viewer already has it**; see the role matrix) |
 | `GET /api/datasources/uid/{uid}` | 200 |
 | `GET /api/search?type=dash-db` | 200 — dashboards |
 | `GET /api/v1/provisioning/alert-rules` | 200 — alert rules |
@@ -104,9 +123,11 @@ Two working paths to Loki. **Both verified.**
 4. **`isGrafanaAdmin: false` on a token that CAN list datasources.** Server-admin ≠ org-admin. Never
    gate a CLI feature on that flag; use `/api/access-control/user/permissions`.
 5. **Service account `id` is 0.** Don't key anything on it; use `uid` (`service-account:N`).
-6. `GET /api/datasources` needs org **Admin**. A Viewer token can query a datasource but cannot
-   enumerate → "what can I get logs from" is impossible for Viewers. `server doctor` must say this
-   precisely rather than surfacing a bare 403.
+6. ~~`GET /api/datasources` needs org **Admin**; a Viewer cannot enumerate.~~ **FALSE — corrected
+   2026-07-17 by measuring it.** A Viewer enumerates datasources fine. Only WRITES need Editor. This
+   claim was reasoned, never measured, and it reached the README, the guide, the `auth login` prompt
+   and the 403 hint before a throwaway stack disproved it — see the role matrix above. `server
+   doctor` reports real scopes rather than guessing from a role name.
 
 ## Bash gotcha (bit me while probing)
 `UID` is a **readonly** shell variable (your uid, e.g. 1000). `UID=P8E8…` silently fails and you probe

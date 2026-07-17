@@ -106,17 +106,36 @@ def test_invalid_regex_fails_here_not_400_rungs_later():
 
 
 def test_level_is_a_pipeline_stage_not_a_selector():
-    """THE Loki trap. `detected_level` is derived at query time and is absent from
-    the index, so `{detected_level="error"}` matches NOTHING while
-    `... | detected_level="error"` works. Verified live, both ways."""
+    """THE Loki trap. The derived level label is absent from the index, so
+    `{detected_level="error"}` matches NOTHING while `... | detected_level="error"`
+    works. Verified live, both ways."""
     q = build_query({"job": "x"}, level="error")
-    assert q == '{job="x"} | detected_level="error"'
+    assert q == '{job="x"} | detected_level="error" or level="error"'
     assert "{detected_level" not in q
+    assert "{level" not in q
+
+
+def test_level_filters_on_BOTH_derived_label_names():
+    """Measured across two servers: Loki 3.0.0 derives `level`, newer Loki derives
+    `detected_level`. Hardcoding either returns an empty SUCCESS on the other --
+    indistinguishable from "there are no errors", which is the worst failure this
+    tool can have. So we union them."""
+    q = build_query({"job": "x"}, level="error")
+    assert 'detected_level="error"' in q
+    assert 'level="error"' in q
+    assert " or " in q
 
 
 def test_level_composes_with_line_filters_in_the_right_order():
     q = build_query({"job": "x"}, contains=["boom"], level="error")
-    assert q == '{job="x"} |= "boom" | detected_level="error"'
+    assert q == '{job="x"} |= "boom" | detected_level="error" or level="error"'
+
+
+def test_level_value_is_escaped_in_every_clause():
+    """A quote in one clause and not the other would be a parse error, and the
+    union makes it easy to escape one and forget the other."""
+    q = build_query({"job": "x"}, level='we"ird')
+    assert q.count('we\\"ird') == 2
 
 
 def test_level_alone_still_needs_a_selector():
@@ -126,7 +145,7 @@ def test_level_alone_still_needs_a_selector():
 
 def test_level_with_match_all():
     assert build_query({}, level="error", match_all_label="hostname") == (
-        '{hostname=~".+"} | detected_level="error"'
+        '{hostname=~".+"} | detected_level="error" or level="error"'
     )
 
 

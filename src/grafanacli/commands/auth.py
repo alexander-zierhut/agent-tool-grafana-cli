@@ -89,17 +89,25 @@ def login(
         if not sys.stdin.isatty():
             raise ConfigError("--token is required when stdin is not a terminal.")
         # The whole point: we know the server now, so show the exact page — and
-        # say WHICH role, because the wrong one breaks this tool's main feature
-        # in a way that looks like a permissions bug rather than a setup choice.
+        # say WHICH role, since that is the one setup choice with consequences.
+        #
+        # The roles below are MEASURED against Grafana 13.0.3 (pinned by
+        # tests/test_roles_live.py), and that matters: this prompt used to tell
+        # people to use Admin, reasoning that only an Admin could enumerate
+        # datasources. The reasoning was wrong — a Viewer enumerates fine — so the
+        # prompt was talking users into granting a CLI org-administration rights it
+        # has never once used. Least privilege is the entire point of a service
+        # account; a setup prompt that inflates it is a security bug, not a typo.
         sys.stderr.write(
             f"\nCreate a service account at:\n  {token_url(server)}\n\n"
-            "Give it the Admin role, then \"Add token\" — the value is shown ONCE, so "
-            "copy it before leaving the page.\n\n"
-            "Why Admin: listing datasources needs the `datasources:read` permission, "
-            "which is org Admin by default. An Editor token can still QUERY a "
-            "datasource it already knows the uid of, but cannot ENUMERATE them — and "
-            "`graf logs sources`, this tool's main feature, is enumeration. An Editor "
-            "token will authenticate fine and then fail exactly there.\n\n"
+            "Then \"Add token\" — the value is shown ONCE, so copy it before leaving "
+            "the page.\n\n"
+            "Which role:\n"
+            "  Viewer  — enough to DISCOVER and READ: `logs sources`, `logs query`,\n"
+            "            `metrics`, `scan`, `alert route`. Pick this if you only read.\n"
+            "  Editor  — the above, plus creating dashboards, alert rules and contact\n"
+            "            points. Pick this if you want `graf alert create`.\n"
+            "  Admin   — grants org administration this tool never uses. Not needed.\n\n"
         )
         token = _prompt("Token: ", secret=True)
     if not token:

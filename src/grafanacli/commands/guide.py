@@ -49,13 +49,15 @@ AUTHENTICATE
   Non-interactive:  export GRAFANA_URL=https://grafana.example.com
                     export GRAFANA_TOKEN=glsa_xxxxxxxx
   Get a token:      <your-grafana>/org/serviceaccounts  → Add service account →
-                    Add token (shown ONCE). Give it the **Admin** role.
+                    Add token (shown ONCE).
   Check:            graf auth status         (says WHICH backend/token is in use)
 
-  Why Admin: listing datasources needs `datasources:read`, which is org Admin by
-  default. An Editor token can query a datasource it already knows the uid of but
-  cannot ENUMERATE — so `graf logs sources`, the thing you start with, cannot
-  work. `graf server doctor` reports exactly what your token can do.
+  WHICH ROLE (measured on 13.0.3, not guessed):
+    Viewer  — discovers and reads everything: sources, logs, metrics, routes.
+    Editor  — the above, PLUS creating dashboards, alert rules, contact points.
+    Admin   — buys this CLI nothing over Editor. Don't hand out more than you need.
+  So: Viewer for read-only, Editor if you want `alert create`.
+  `graf server doctor` reports exactly what YOUR token can do, with scopes.
 
   NOTE: GRAFANA_TOKEN in the environment OVERRIDES a keyring login, silently. If
   results look wrong, run `auth status` — it names the token actually in use.
@@ -433,10 +435,18 @@ AUTHENTICATION
 
   WHICH TOKEN TO MINT
     <your-grafana>/org/serviceaccounts -> Add service account -> Add token.
-    The value is shown ONCE. Give it the **Admin** role: listing datasources needs
-    `datasources:read`, which is org Admin by default. An Editor token can query a
-    datasource whose uid it already knows, but cannot enumerate -- so `logs
-    sources` is impossible and the tool loses its point.
+    The value is shown ONCE.
+
+    Role, measured against Grafana 13.0.3 (tests/test_roles_live.py pins it):
+      Viewer  discover + read: logs sources, logs query, metrics, scan,
+              alert route, notify check. Everything read-only.
+      Editor  all of that, PLUS dashboard create, alert create, notify write.
+      Admin   nothing extra for this CLI.
+    Pick Viewer if you only read; Editor if you create. Never Admin "to be safe" --
+    it grants org administration this tool never uses.
+
+    Dashboard and alert-rule permissions are scoped PER FOLDER, so an Editor token
+    can write in one folder and be refused in another.
 
     API keys (/org/apikeys) are deprecated since Grafana 9.1. Use a service
     account.
@@ -551,8 +561,9 @@ GOTCHAS — all verified live against Grafana 13.0.3
   - A datasource can be configured and its backend still be DOWN: exit 8, not an
     auth or config error. The proxy returns 502 with an EMPTY body, so anything
     assuming JSON dies rather than reporting it.
-  - Listing datasources needs org Admin. An Editor token can query one it already
-    knows and cannot discover any. That kills `logs sources`.
+  - Listing datasources needs `datasources:read`, which **Viewer already has**.
+    (An earlier version of this guide claimed org Admin. It was wrong -- measured,
+    not reasoned. Only WRITES need Editor.)
   - Some datasources inject SECRET headers (held write-only in Grafana's
     `secureJsonFields`) to scope a tenant. You can never read them, so you can
     never talk to Loki directly and reproduce the request -- and a direct

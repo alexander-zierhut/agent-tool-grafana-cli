@@ -446,7 +446,7 @@ rather than one of them crashing the command.
 
 Every datasource in this org, classified by what this CLI can do with it.
 
-Needs org Admin (`datasources:read`) — see the module docstring. `logs`/
+Needs `datasources:read`, which Viewer already has — see the module docstring. `logs`/
 `metrics` are `"supported"` (this CLI can query it), `"recognised"` (it is
 a known log/metric-capable type, e.g. Elasticsearch, but not implemented
 here yet), or `null` (neither — a plugin datasource, or one that is
