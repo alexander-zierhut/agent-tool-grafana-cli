@@ -53,7 +53,25 @@ Two working paths to Loki. **Both verified.**
   label**, not just label names — "you can filter on `job`" is worthless when `job` has one value.
 - `GET .../query_range?query={...}&start=&end=&limit=&direction=backward` → 200
   `{"status":"success","data":{"resultType":"streams","result":[{"stream":{...},"values":[[ns,line],…]}]}}`
-  **start/end are UNIX NANOSECONDS** (`$(date +%s)000000000`). Seconds silently return nothing.
+
+  **Timestamps: Loki switches on DIGIT COUNT, not unit.** ~~Seconds silently return
+  nothing~~ — *that earlier claim was WRONG, and a live test caught it.* Loki's
+  `parseTimestamp` is `len(value) <= 10 → seconds, else nanoseconds`. Measured, one
+  instant, four encodings:
+
+  | encoding | digits | result |
+  | --- | --- | --- |
+  | seconds | 10 | ✅ works |
+  | **milliseconds** | **13** | ❌ **read as nanos → 1970 → empty, `status: success`** |
+  | microseconds | 16 | ❌ read as nanos → 1970 → empty |
+  | nanoseconds | 19 | ✅ works |
+  | (11-digit boundary) | 11 | ❌ empty — confirms the `<=10` rule exactly |
+
+  So the trap is **milliseconds**, not seconds — and millis are the natural reach
+  (`Date.now()`, `time.time()*1000`, Grafana's own UI). The failure is a `success`
+  with an empty result: indistinguishable from "there are no logs".
+  **We always send 19 digits** (`TimeRange.loki()`), the one encoding that cannot be
+  misread. Regression-tested live in `test_loki_reads_timestamps_by_DIGIT_COUNT_not_unit`.
 - Also available: `.../series`, `.../index/stats`, `.../query` (instant).
 
 ### B) `POST /api/ds/query` (modern, unified, but harder)
@@ -78,7 +96,11 @@ Two working paths to Loki. **Both verified.**
 2. **`/labels` and `/label/{n}/values` are TIME-BOUNDED.** They default to a recent window; a label
    that existed last week may be absent now. Pass `start`/`end` explicitly and report the window used,
    or "what can I get logs from" silently changes answer by time of day.
-3. **Nanosecond timestamps** on the proxy path. Seconds → empty result, no error.
+3. **Timestamps on the proxy path are read by digit count** (`<=10` = seconds, else
+   nanos). **Milliseconds (13 digits) → a window in 1970 → empty result, no error.**
+   Corrected 2026-07-17: the original note here said "seconds → nothing", which was
+   wrong — a live test contradicted it. This is the second time on this project that
+   a *written-down* finding beat a *re-measured* one and lost. Re-measure.
 4. **`isGrafanaAdmin: false` on a token that CAN list datasources.** Server-admin ≠ org-admin. Never
    gate a CLI feature on that flag; use `/api/access-control/user/permissions`.
 5. **Service account `id` is 0.** Don't key anything on it; use `uid` (`service-account:N`).

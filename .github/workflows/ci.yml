@@ -1,0 +1,117 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch: {}
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Fast, hermetic unit tests across every supported Python. This is the tier
+  # that actually guards a PR: it needs no server, no token and no network, so it
+  # cannot be skipped, flake, or be quietly disabled by a missing secret.
+  unit:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: pip install -e '.[test]'
+      # The MARKER selects the hermetic set — never a file list, which silently
+      # fails to grow when someone adds a test file. (The sibling OpenProject CLI
+      # ran 30 of its 144 hermetic tests this way while claiming to run them all.)
+      - name: Unit tests (no server, no network)
+        run: python -m pytest -m "not integration" -q
+
+  # Live, READ-ONLY tests against a real Grafana.
+  #
+  # Deliberately NOT run on pull_request: the only instance available is a
+  # production one, a fork's PR must never reach it, and `pull_request` cannot
+  # read secrets from a fork anyway — so it would "pass" by skipping, which is
+  # worse than not running. Push-to-main and manual dispatch only.
+  #
+  # The `if` gates on a secret being present so the job is a no-op (not a
+  # failure) in a clone that has none. Everything it runs is read-only by
+  # construction: see the module docstring in tests/test_integration_live.py.
+  # Write paths are covered by --dry-run in the hermetic tier.
+  integration:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e '.[test]'
+      - name: Live read-only tests (skips cleanly without secrets)
+        env:
+          GRAFANA_URL: ${{ secrets.GRAFANA_URL }}
+          GRAFANA_TOKEN: ${{ secrets.GRAFANA_TOKEN }}
+          # A token from a SECOND org. Without it the multi-org tests skip —
+          # they are the ones that prove tokens cannot cross orgs, which is the
+          # assumption the whole profile-per-org design rests on.
+          GRAFANA_TOKEN_ORG6: ${{ secrets.GRAFANA_TOKEN_ORG2 }}
+        run: python -m pytest -m integration -q -rs
+
+  # Verify the distributables build and actually run.
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # The package + its runtime deps, so PyInstaller has everything to bundle.
+      - run: pip install -e '.[build]' build
+      - name: Build wheel + sdist
+        run: |
+          python -m build
+          ls -l dist
+      - name: Install the wheel into a clean venv and smoke-test
+        run: |
+          # A clean venv, because `pip install -e .` in the job venv would make a
+          # broken wheel look installable — the entry point would resolve from the
+          # source tree either way.
+          python -m venv /tmp/clean
+          /tmp/clean/bin/pip install dist/*.whl
+          /tmp/clean/bin/graf --version
+      - name: Build the single-file binary
+        run: python scripts/build_binary.py
+      - name: Smoke-test the binary
+        run: ./dist/graf --version
+      # The guide is what an agent runs FIRST, with no config and no token. If it
+      # can fail on a missing config dir, the tool is unusable exactly when it is
+      # most needed — so prove it in the shipped artifact, not just in pytest.
+      - name: The guide must work with no config, no token, no HOME
+        run: env -i PATH=/usr/bin:/bin HOME=/nonexistent ./dist/graf guide > /dev/null
+
+  # Generated docs can never drift: regenerate, then fail if anything changed.
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e .
+      - name: Regenerate docs/COMMANDS.md
+        run: python scripts/gen_docs.py
+      - name: Fail if the committed docs are stale
+        run: |
+          # `add -N` registers any brand-new file with the index so `git diff`
+          # sees it. Without it an entirely uncommitted docs/COMMANDS.md is
+          # untracked, diffs clean, and this check passes while shipping no docs.
+          git add -N docs/
+          git diff --exit-code docs/ || {
+            echo "::error::docs/COMMANDS.md is out of date — run: python scripts/gen_docs.py"
+            exit 1
+          }
