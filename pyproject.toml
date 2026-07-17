@@ -1,0 +1,75 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agent-tool-grafana-cli"
+description = "Agent-ready command-line interface for Grafana — find what you can get logs from, then get them (Loki/Elasticsearch), plus dashboards, datasources and alerts."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Zierhut IT" }, { name = "Alexander Zierhut" }]
+dynamic = ["version"]
+keywords = [
+    "grafana", "loki", "logs", "logql", "observability", "cli", "command-line",
+    "grafana-api", "datasources", "dashboards", "alerting",
+    "ai-agent", "llm", "automation", "devops", "sre",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: System :: Logging",
+    "Topic :: System :: Monitoring",
+    "Topic :: Utilities",
+]
+dependencies = [
+    # The shared chassis: exit-code contract, Emitter, credentials, AppSpec.
+    # Pinned to a major -- the exit codes and output shapes are published API.
+    "agent-tool-shared-cli>=0.1,<0.2",
+    "typer>=0.12",
+    "httpx>=0.27",
+    "keyring>=25",
+    "rich>=13",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=8",
+    "pytest-timeout>=2.3",
+]
+build = [
+    "pyinstaller>=6",
+]
+
+[project.urls]
+Homepage = "https://github.com/alexander-zierhut/agent-tool-grafana-cli"
+Repository = "https://github.com/alexander-zierhut/agent-tool-grafana-cli"
+Issues = "https://github.com/alexander-zierhut/agent-tool-grafana-cli/issues"
+Changelog = "https://github.com/alexander-zierhut/agent-tool-grafana-cli/releases"
+
+[project.scripts]
+# PROVISIONAL -- see README "The name". `grafana-cli` is NOT claimed: that is the
+# official binary shipped with every Grafana server install (plugin management),
+# and shadowing it is the same mistake we refused with `op` and `drone`.
+# `grafanactl` is also taken (grafana/grafanactl, dashboards-as-code).
+graf = "grafanacli.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+# Single source of truth for the version.
+[tool.setuptools.dynamic]
+version = { attr = "grafanacli.__version__" }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra -q"
+markers = [
+    "integration: talks to a live Grafana (requires GRAFANA_URL + GRAFANA_TOKEN)",
+    "needs_loki: additionally requires a Loki datasource with data in it",
+]
+timeout = 120
