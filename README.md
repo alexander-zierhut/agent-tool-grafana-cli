@@ -4,10 +4,20 @@ Agent-ready CLI for **Grafana**, from a developer's perspective: *find out what
 you can even get logs from, then get them* — and set up an alert so you hear
 about it next time.
 
+[![PyPI](https://img.shields.io/pypi/v/agent-tool-grafana-cli)](https://pypi.org/project/agent-tool-grafana-cli/)
+[![CI](https://github.com/alexander-zierhut/agent-tool-grafana-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/alexander-zierhut/agent-tool-grafana-cli/actions/workflows/ci.yml)
+![Python](https://img.shields.io/pypi/pyversions/agent-tool-grafana-cli)
+![License: MIT](https://img.shields.io/badge/license-MIT-green)
+![Agent ready](https://img.shields.io/badge/agent-ready-8A2BE2)
+
 ```bash
 pipx install agent-tool-grafana-cli
 grafana-cli guide
 ```
+
+**Keywords:** Grafana CLI, Grafana command line, Grafana API client, Loki logs,
+LogQL, observability CLI, SRE tooling, alerting, datasources, dashboards, AI agent
+tool, LLM tooling, Claude, DevOps automation.
 
 ## Contributing takes two commands
 
@@ -61,6 +71,47 @@ grafana-cli alert create --title "..." -q '<query>' --folder <uid>
 
 It pairs with the siblings: `drone-cli wait --commit HEAD && grafana-cli scan --since 10m`
 answers *"my commit built — is it healthy in production?"*
+
+## The command surface
+
+Everything is discoverable from the binary — `grafana-cli --help`, then
+`grafana-cli guide` for the playbook and `grafana-cli <group> --help` for any
+group. The top level:
+
+```text
+ Usage: grafana-cli [OPTIONS] COMMAND [ARGS]...
+
+ Agent-friendly CLI for Grafana: find what you can get logs from, read them, work
+ out what is wrong, and set up an alert so you hear about it next time.
+
+ Output is JSON on stdout by default (errors are JSON on stderr with a non-zero
+ exit code); add `-o table` or trim with `--fields label,values`. Start with
+ `grafana-cli logs sources` — you cannot query what you cannot name.
+
+ New here / no context? Run `grafana-cli guide` for the full playbook.
+
+╭─ Commands ───────────────────────────────────────────────────────────────────────╮
+│ guide       Built-in operating guide — how to use this CLI without external docs.│
+│ scan        Is this healthy? Find errors, panics and deprecations in one pass.   │
+│ logs        Logs: discover sources, query, and find similar problems.            │
+│ metrics     Metrics: PromQL against Prometheus/Mimir.                            │
+│ dashboard   Dashboards: find, read, create.                                      │
+│ alert       Alert rules — including `alert route`: will it reach you?            │
+│ notify      Contact points, notification policies, silences.                     │
+│ datasource  Datasources: list, inspect, health-check.                            │
+│ org         Organisations — and why a token only ever sees one.                  │
+│ auth        Log in, log out, inspect credentials.                                │
+│ server      Health, version — and `server doctor`.                               │
+│ raw         Escape hatch: call any API endpoint directly.                        │
+│ settings    View & change CLI settings.                                          │
+│ context     Sticky session defaults (datasource, etc.), per profile.            │
+│ install     Integrate with other tools (e.g. `install claude`).                 │
+╰──────────────────────────────────────────────────────────────────────────────────╯
+```
+
+Global options — `-o/--output json|table|markdown|csv`, `--fields`, `--dry-run`,
+`--stream`, `--no-context` — work anywhere on the line. Full reference:
+[docs/COMMANDS.md](docs/COMMANDS.md).
 
 ## The killer feature: discovery
 
@@ -149,12 +200,21 @@ Works against Grafana with **Loki** (logs) and **Prometheus/Mimir/Thanos/Cortex*
 
 ## Part of the family
 
-Built on [agent-tool-shared-cli](https://github.com/alexander-zierhut/agent-tool-shared-cli):
-JSON on stdout, JSON errors on stderr, stable exit codes, `--dry-run`, and a
-built-in `guide` so an agent can learn the tool from the tool.
+Built on **[agent-tool-shared-cli](https://github.com/alexander-zierhut/agent-tool-shared-cli)** —
+the chassis every tool in this family shares: JSON on stdout, JSON errors on
+stderr, a stable cross-tool exit-code contract, `--dry-run`, four output formats,
+and a built-in `guide` so an agent can learn each tool from the tool itself.
 
-Siblings: [openproject](https://github.com/alexander-zierhut/agent-tool-openproject-cli) ·
-[drone](https://github.com/alexander-zierhut/agent-tool-drone-cli)
+| Tool | Install | For |
+| --- | --- | --- |
+| [**drone-cli**](https://github.com/alexander-zierhut/agent-tool-drone-cli) | `pipx install agent-tool-drone-cli` | Drone CI — builds, failing-step logs, promotions |
+| [**grafana-cli**](https://github.com/alexander-zierhut/agent-tool-grafana-cli) | `pipx install agent-tool-grafana-cli` | Grafana — log discovery, health scan, alert routing |
+| [**openproject**](https://github.com/alexander-zierhut/agent-tool-openproject-cli) | `pipx install agent-tool-openproject-cli` | OpenProject — work packages, time, invoicing |
+| [**lexware-office**](https://github.com/alexander-zierhut/agent-tool-lexware-office-cli) | `pipx install agent-tool-lexware-office-cli` | Lexware Office — invoices, contacts, AR-aging |
+
+They compose over the shared contract:
+`drone-cli wait --commit HEAD && grafana-cli scan --since 10m` answers *"my commit
+built — is it healthy in production?"*
 
 ## The name — and one thing to know about it
 
@@ -194,4 +254,4 @@ ln -s "$(pipx environment --value PIPX_BIN_DIR)/grafana-cli" ~/.local/bin/graf
 
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE).
