@@ -78,7 +78,7 @@ def _root(
     #  - stdin AND stdout must be TTYs (stdin alone fires the prompt into `| jq`
     #    from a real terminal and hangs it forever);
     #  - CI=true is the universal signal.
-    meta = ctx.invoked_subcommand in ("settings", "guide", "install", "context")
+    meta = ctx.invoked_subcommand in ("settings", "guide", "install", "context", "report")
     interactive = (
         not meta
         and sys.stdin.isatty()
@@ -180,12 +180,14 @@ from .commands import (  # noqa: E402
     notify,
     org,
     raw,
+    report,
     scan,
     server,
     settings,
 )
 
 app.command("guide", help="Built-in operating guide — how to use this CLI without external docs.")(guide.guide)
+app.command("report", help="Report a bug or missing feature — prints this tool's repo and a pre-filled issue link (offline, no token).")(report.report)
 
 # Top-level, because this is the thing you actually came here to do. The whole
 # point of the tool is "I deployed, is it broken?" -> `grafana-cli scan`; burying that

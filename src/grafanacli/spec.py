@@ -20,6 +20,7 @@ SPEC = AppSpec(
     env_prefix="GRAFANACLI",
     # The ecosystem's variable. Honoured after GRAFANACLI_TOKEN.
     token_env_aliases=("GRAFANA_TOKEN",),
+    repo="alexander-zierhut/agent-tool-grafana-cli",
 )
 
 credentials = Credentials(SPEC)

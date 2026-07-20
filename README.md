@@ -92,6 +92,7 @@ group. The top level:
 
 ╭─ Commands ───────────────────────────────────────────────────────────────────────╮
 │ guide       Built-in operating guide — how to use this CLI without external docs.│
+│ report      Report a bug / missing feature — repo + pre-filled issue link.       │
 │ scan        Is this healthy? Find errors, panics and deprecations in one pass.   │
 │ logs        Logs: discover sources, query, and find similar problems.            │
 │ metrics     Metrics: PromQL against Prometheus/Mimir.                            │

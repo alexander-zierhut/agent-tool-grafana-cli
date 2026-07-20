@@ -161,3 +161,25 @@ boot and seed a throwaway stack in ~30s with no credentials.
 - `UID` is a **readonly** shell variable. Probing `/uid/$UID/` silently asks about
   uid 1000. It is documented in the findings file and it still caught the author
   a second time. Use another name.
+
+## Reporting a problem — open a GitHub issue
+
+If a task was painful, needed too many steps, hit a missing feature, or was
+impossible with `grafana-cli` — **and the user asks you to file it** — open an issue on
+this tool's own repo. Only when asked; never unprompted; one issue per problem.
+
+- Repo: `alexander-zierhut/agent-tool-grafana-cli`
+- Issues: https://github.com/alexander-zierhut/agent-tool-grafana-cli/issues
+- Self-contained (no repo/README needed beside the binary): `grafana-cli report` prints exactly this — the repo, a pre-filled `issues/new` link, and a `gh` one-liner — offline, no token.
+
+Search for a duplicate first, then file — prefer the `gh` CLI:
+
+```bash
+gh issue list   --repo alexander-zierhut/agent-tool-grafana-cli --search "<keywords>"
+gh issue create --repo alexander-zierhut/agent-tool-grafana-cli \
+  --title "<one-line summary>" \
+  --body  "<goal · exact command(s) run · JSON error + exit code · `grafana-cli --version` · what would have made it work>"
+```
+
+If `gh` is missing or unauthenticated, hand the user a prefilled link instead:
+`https://github.com/alexander-zierhut/agent-tool-grafana-cli/issues/new?title=…&body=…`.

@@ -18,6 +18,7 @@ _Every command also accepts `--output/-o` (json\|table\|markdown\|csv), `--forma
 - [`notify`](#notify) — Contact points, notification policies, silences.
 - [`org`](#org) — Organisations — and why a token only ever sees one.
 - [`raw`](#raw) — Escape hatch: call any API endpoint directly.
+- [`report`](#report) — Report a bug or missing feature — prints this tool's repo and a pre-filled issue link (offline, no token).
 - [`scan`](#scan) — Is this healthy? Find errors, panics and deprecations in one pass.
 - [`server`](#server) — Health, version — and `server doctor`.
 - [`settings`](#settings) — View & change CLI settings.
@@ -986,6 +987,12 @@ PUT a full JSON body to an endpoint. Preview any write with a global `--dry-run`
 | `--data`, `-d` | JSON request body. |
 | `--data-file` | File containing the JSON body. |
 | `--param`, `-P` | Query param key=value (repeatable). |
+
+## `report`
+
+### `grafana-cli report`
+
+Report a bug or missing feature — prints this tool's repo and a pre-filled issue link (offline, no token).
 
 ## `scan`
 
