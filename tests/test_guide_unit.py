@@ -61,7 +61,7 @@ _NOT_A_COMMAND = re.compile(r"^(-|<|\.\.\.|\||$)")
 
 #: `grafana-cli <thing>` or `grafana-cli -p x <thing> <sub>`. Captures up to two words so
 #: `grafana-cli logs sources` resolves as a path, not just `logs`.
-_INVOCATION = re.compile(r"\bgraf\s+((?:-\w+\s+\S+\s+)*)([a-z][\w-]*)(?:\s+([a-z][\w-]*))?")
+_INVOCATION = re.compile(r"(?<![\w-])grafana-cli[ \t]+((?:-\w+\s+\S+\s+)*)([a-z][\w-]*)(?:\s+([a-z][\w-]*))?")
 
 
 def _invocations(text: str) -> set[str]:
@@ -225,3 +225,10 @@ def test_the_skill_anchors_its_triggers_to_grafana():
     assert "grafana" in lowered
     for bare in re.findall(r"^\s*[-*]\s+\"?(logs|dashboard|alert)\"?\s*$", I.SKILL_MD, re.M | re.I):
         pytest.fail(f"SKILL.md has an unanchored trigger word: {bare!r}")
+
+
+def test_the_invocation_regex_is_not_stale():
+    """A renamed binary once left this regex matching nothing, so every resolution
+    test above passed vacuously. Pin that it still finds the commands."""
+    assert len(_invocations(G.OVERVIEW + "".join(G.TOPICS.values()))) > 20
+    assert len(_invocations(I.SKILL_MD)) > 10
